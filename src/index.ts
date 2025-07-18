@@ -3,7 +3,11 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import Telnyx from "telnyx";
 import { Redis } from "@upstash/redis";
 import * as http from "http";
-import { getAllPhrases, markPhraseAsUsed } from "./lib/util";
+import {
+  getAllPhrases,
+  markPhraseAsUsed,
+  resetPhrasesIfAllUsed,
+} from "./lib/util";
 
 // Patch http.ClientRequest to handle undefined timeout values
 // The current version of the Telnyx SDK is so bad
@@ -93,7 +97,6 @@ app.post("/intercom", async (request, _res) => {
       console.log(transcriptionData);
       const transcription = transcriptionData.transcript.trim().toLowerCase();
 
-      // Get all phrases from Redis and check if transcript contains any
       const allPhrases = await getAllPhrases();
       const matchingPhrase = allPhrases.find((p) =>
         transcription.includes(p.key.toLowerCase())
@@ -102,7 +105,6 @@ app.post("/intercom", async (request, _res) => {
       if (matchingPhrase) {
         console.log("Phrase recognized:", matchingPhrase.key);
 
-        // Check if phrase has already been used (has ISO date)
         const isUsed =
           matchingPhrase.value &&
           !isNaN(new Date(matchingPhrase.value as string).getTime());
@@ -121,6 +123,8 @@ app.post("/intercom", async (request, _res) => {
           await telnyx.calls.hangup(callControlId, {});
 
           await markPhraseAsUsed(matchingPhrase.key);
+
+          await resetPhrasesIfAllUsed();
         }
       }
     }

@@ -19,3 +19,28 @@ export async function markPhraseAsUsed(phrase: string) {
   await redis.set(phrase, isoDate);
   return isoDate;
 }
+
+export async function resetPhrasesIfAllUsed() {
+  const allPhrases = await getAllPhrases();
+
+  const allHaveDates = allPhrases.every(
+    (p) => p.value && !isNaN(new Date(p.value as string).getTime())
+  );
+
+  if (!allHaveDates) {
+    return false;
+  }
+
+  const sortedPhrases = allPhrases.sort(
+    (a, b) =>
+      new Date(b.value as string).getTime() -
+      new Date(a.value as string).getTime()
+  );
+  const phrasesToReset = sortedPhrases.slice(3);
+  await Promise.all(phrasesToReset.map((phrase) => redis.set(phrase.key, "")));
+
+  console.log(
+    `All phrases exhausted; reset ${phrasesToReset.length} phrases, all but last 3 used.`
+  );
+  return true;
+}
