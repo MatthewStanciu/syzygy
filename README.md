@@ -1,11 +1,3 @@
-To install dependencies:
-```sh
-bun install
-```
+# syzygy
 
-To run:
-```sh
-bun run dev
-```
-
-open http://localhost:3000
+🔑 an intercom
