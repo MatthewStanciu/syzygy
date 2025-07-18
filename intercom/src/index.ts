@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { serveStatic } from "@hono/node-server/serve-static";
 import Telnyx from "telnyx";
-import { Redis } from "@upstash/redis";
 import * as http from "http";
 import {
   getAllPhrases,
