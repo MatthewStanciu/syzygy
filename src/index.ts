@@ -8,6 +8,7 @@ import {
   markPhraseAsUsed,
   resetPhrasesIfAllUsed,
   normalizeTextForMatching,
+  openDoor,
 } from "./lib/util";
 
 // Patch http.ClientRequest to handle undefined timeout values
@@ -27,7 +28,8 @@ http.ClientRequest.prototype.setTimeout = function (
 // Initialize Telnyx client
 const telnyx = new Telnyx(`${process.env.TELNYX_API_KEY}`);
 const app = new Hono();
-const redis = Redis.fromEnv(); // initialize redis with values from .env
+
+const codeDigits: string[] = [];
 
 type TranscriptionData = {
   confidence: number;
@@ -41,6 +43,7 @@ type CallControlEvent =
   | Telnyx.events.CallAnsweredEvent
   | Telnyx.events.CallSpeakEndedEvent
   | Telnyx.events.TranscriptionEvent
+  | Telnyx.events.CallDtmfReceivedEvent
   | Telnyx.events.CallPlaybackEndedEvent;
 
 app.get("/intercom", async (request, _response) => {
@@ -115,20 +118,21 @@ app.post("/intercom", async (request, _res) => {
           console.log("Phrase already used, hanging up");
           await telnyx.calls.hangup(callControlId, {});
         } else {
-          console.log("Phrase not used, proceeding with unlock");
-          await telnyx.calls
-            .sendDtmf(callControlId, {
-              digits: "9",
-              duration_millis: 250,
-            })
-            .then((res) => console.log("dtmf: ", res?.data?.result));
-          await telnyx.calls.hangup(callControlId, {});
-
+          await openDoor(callControlId);
           await markPhraseAsUsed(matchingPhrase.key);
-
           await resetPhrasesIfAllUsed();
         }
       }
+    } else if (call.data.event_type === "call.dtmf.received") {
+      console.log(call.data.payload);
+      const digit = call.data.payload!.digit as string;
+      codeDigits.push(digit);
+
+      if (codeDigits.join("") === "1009") {
+        await openDoor(callControlId);
+      }
+    } else {
+      console.log("unknown event!", call.data.event_type);
     }
 
     return request.json({ status: "success" });

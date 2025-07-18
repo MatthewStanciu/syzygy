@@ -1,6 +1,19 @@
 import { Redis } from "@upstash/redis";
+import Telnyx from "telnyx";
 
+const telnyx = new Telnyx(`${process.env.TELNYX_API_KEY}`);
 const redis = Redis.fromEnv();
+
+export async function openDoor(callControlId: string) {
+  console.log("opening door!");
+  await telnyx.calls
+    .sendDtmf(callControlId, {
+      digits: "9",
+      duration_millis: 250,
+    })
+    .then((res) => console.log("dtmf: ", res?.data?.result));
+  await telnyx.calls.hangup(callControlId, {});
+}
 
 export async function getAllPhrases() {
   const keys = await redis.keys("*"); // it's only like 50 so this should be fine
