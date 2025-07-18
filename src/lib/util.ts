@@ -44,3 +44,9 @@ export async function resetPhrasesIfAllUsed() {
   );
   return true;
 }
+
+export function normalizeTextForMatching(text: string): string {
+  // Remove spaces, punctuation, and convert to lowercase
+  // Keep only alphanumeric characters
+  return text.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
