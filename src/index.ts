@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { serveStatic } from "@hono/node-server/serve-static";
 import Telnyx from "telnyx";
 import * as http from "http";
+import phrases from "./lib/phrases";
 
 // Patch http.ClientRequest to handle undefined timeout values
 // The current version of the Telnyx SDK is so bad
@@ -12,7 +13,7 @@ http.ClientRequest.prototype.setTimeout = function (
 ) {
   // If msecs is undefined, use a default value of 30 seconds
   if (msecs === undefined) {
-    msecs = 60000;
+    msecs = 20000;
   }
   return originalSetTimeout.call(this, msecs, callback);
 };
@@ -21,11 +22,18 @@ http.ClientRequest.prototype.setTimeout = function (
 const telnyx = new Telnyx(`${process.env.TELNYX_API_KEY}`);
 const app = new Hono();
 
+type TranscriptionData = {
+  confidence: number;
+  is_final: boolean;
+  transcript: string;
+};
+
 type CallControlEvent =
   | Telnyx.events.CallHangupEvent
   | Telnyx.events.CallInitiatedEvent
   | Telnyx.events.CallAnsweredEvent
   | Telnyx.events.CallSpeakEndedEvent
+  | Telnyx.events.TranscriptionEvent
   | Telnyx.events.CallPlaybackEndedEvent;
 
 app.get("/intercom", async (request, _response) => {
@@ -37,10 +45,13 @@ app.get("/beep.mp3", serveStatic({ path: "./public/beep.mp3" }));
 
 app.post("/intercom", async (request, _res) => {
   // const data = (request.body as CallControlEvent).data!;
-  const call = await request.req.json();
+  const call = (await request.req.json()) as CallControlEvent;
   console.log({ call });
   try {
-    const callControlId = call.data.payload!.call_control_id!;
+    const callControlId = call.data?.payload?.call_control_id;
+    if (!call.data || !callControlId) {
+      return request.json({ error: "Can't find call control ID" }, 500);
+    }
 
     if (call.data.event_type === "call.hangup") {
       console.log("Call has ended.");
@@ -57,7 +68,6 @@ app.post("/intercom", async (request, _res) => {
         record_track: "both",
         record_max_length: 600,
       });
-      console.log("answered?");
     } else if (call.data.event_type === "call.answered") {
       // Play a beep sound first
       console.log("call answered, playing beep");
@@ -73,10 +83,29 @@ app.post("/intercom", async (request, _res) => {
         .catch((err) => console.error("failed to play beep", err));
     } else if (call.data.event_type === "call.playback.ended") {
       console.log("Beep sound has ended.");
+
       // After beep sound ends, listen for & parse passphrase
-    } else if (call.data.event_type === "call.speak.ended") {
-      console.log("Speak has ended.");
-      telnyx.calls.hangup(callControlId, {});
+      telnyx.calls.transcriptionStart(callControlId, {
+        transcription_engine: "A",
+        transcription_tracks: "inbound",
+      });
+    } else if (call.data.event_type === "call.transcription") {
+      const transcriptionData = call.data.payload!
+        .transcription_data as TranscriptionData;
+      console.log(transcriptionData);
+      const transcription = transcriptionData.transcript.trim().toLowerCase();
+
+      if (phrases.includes(transcription)) {
+        console.log("Phrase recognized:", transcription);
+
+        await telnyx.calls
+          .sendDtmf(callControlId, {
+            digits: "9",
+            duration_millis: 250,
+          })
+          .then((res) => console.log("dtmf: ", res?.data?.result));
+        await telnyx.calls.hangup(callControlId, {});
+      }
     }
 
     return request.json({ status: "success" });
