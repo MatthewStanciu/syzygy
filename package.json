@@ -1,0 +1,14 @@
+{
+  "name": "syzygy",
+  "scripts": {
+    "dev": "bun run --hot src/index.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.16.0",
+    "hono": "^4.8.5",
+    "telnyx": "^2.0.1-beta.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}
