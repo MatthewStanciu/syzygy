@@ -5,6 +5,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.16.0",
+    "@upstash/redis": "^1.35.1",
     "hono": "^4.8.5",
     "telnyx": "^2.0.1-beta.0"
   },
