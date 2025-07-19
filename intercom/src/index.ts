@@ -129,6 +129,7 @@ app.post("/intercom", async (request, _res) => {
 
       if (codeDigits.join("") === "1009") {
         await openDoor(callControlId);
+        codeDigits.length = 0;
       }
     } else {
       console.log("unknown event!", call.data.event_type);
