@@ -9,7 +9,7 @@ export async function openDoor(callControlId: string) {
   await telnyx.calls
     .sendDtmf(callControlId, {
       digits: "9",
-      duration_millis: 250,
+      duration_millis: 400,
     })
     .then((res) => console.log("dtmf: ", res?.data?.result));
   await telnyx.calls.hangup(callControlId, {});
