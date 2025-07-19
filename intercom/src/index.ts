@@ -80,7 +80,7 @@ app.post("/intercom", async (request, _res) => {
       console.log("call answered, playing beep");
       telnyx.calls
         .playbackStart(callControlId, {
-          audio_url: "https://doggo.ninja/j8R5jq.mp3",
+          audio_url: "https://doggo.ninja/yeLcOA.mp3",
           loop: 1,
           overlay: false,
           target_legs: "self",
@@ -97,11 +97,13 @@ app.post("/intercom", async (request, _res) => {
     } else if (call.data.event_type === "call.transcription") {
       const transcriptionData = call.data.payload!
         .transcription_data as TranscriptionData;
-      console.log(transcriptionData);
+      // console.log(transcriptionData);
       const transcription = transcriptionData.transcript.trim().toLowerCase();
+      console.log({ transcription });
 
       const allPhrases = await getAllPhrases();
       const normalizedTranscript = normalizeTextForMatching(transcription);
+      console.log({ normalizedTranscript });
       const matchingPhrase = allPhrases.find((p) =>
         normalizedTranscript.includes(normalizeTextForMatching(p.key))
       );
@@ -127,7 +129,8 @@ app.post("/intercom", async (request, _res) => {
       const digit = call.data.payload!.digit as string;
       codeDigits.push(digit);
 
-      if (codeDigits.join("") === "1009") {
+      console.log(codeDigits.join(""), codeDigits.join("").slice(-4));
+      if (codeDigits.join("").slice(-4) === "1009") {
         await openDoor(callControlId);
         codeDigits.length = 0;
       }
