@@ -1,5 +1,6 @@
 import { Redis } from "@upstash/redis";
 import Telnyx from "telnyx";
+import { distance } from "fastest-levenshtein";
 
 const telnyx = new Telnyx(`${process.env.TELNYX_API_KEY}`);
 const redis = Redis.fromEnv();
@@ -64,31 +65,11 @@ export function normalizeTextForMatching(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-export function calculateCharacterMatch(
-  phrase: string,
-  transcript: string
-): number {
-  if (phrase.length === 0) return 0;
-
-  let matchCount = 0;
-  const transcriptChars = transcript.split("");
-
-  for (const char of phrase) {
-    const index = transcriptChars.indexOf(char);
-    if (index !== -1) {
-      matchCount++;
-      transcriptChars.splice(index, 1); // Remove matched character to avoid double counting
-    }
-  }
-
-  return matchCount / phrase.length;
-}
-
 // This was written by Claude 4 D:
 export function isCloseMatch(
   phrase: string,
   transcript: string,
-  threshold: number = 0.6
+  threshold: number
 ): boolean {
   const normalizedPhrase = normalizeTextForMatching(phrase);
   const normalizedTranscript = normalizeTextForMatching(transcript);
@@ -99,9 +80,8 @@ export function isCloseMatch(
   }
 
   // Then try fuzzy matching
-  const similarity = calculateCharacterMatch(
-    normalizedPhrase,
-    normalizedTranscript
+  return (
+    distance(normalizedPhrase, normalizedTranscript) <=
+    normalizedPhrase.length * threshold
   );
-  return similarity >= threshold;
 }

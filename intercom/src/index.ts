@@ -104,7 +104,7 @@ app.post("/intercom", async (request, _res) => {
 
       const allPhrases = await getAllPhrases();
       const matchingPhrase = allPhrases.find((p) =>
-        isCloseMatch(p.key, transcription, 0.6)
+        isCloseMatch(p.key, transcription, 0.45)
       );
 
       if (matchingPhrase) {
