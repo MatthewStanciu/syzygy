@@ -118,8 +118,8 @@ app.post("/intercom", async (request, _res) => {
           await telnyx.calls.hangup(callControlId, {});
         } else {
           await openDoor(callControlId);
-          await markPhraseAsUsed(matchingPhrase.key);
-          await resetPhrasesIfAllUsed();
+          // await markPhraseAsUsed(matchingPhrase.key);
+          // await resetPhrasesIfAllUsed();
         }
       }
     } else if (call.data.event_type === "call.dtmf.received") {
