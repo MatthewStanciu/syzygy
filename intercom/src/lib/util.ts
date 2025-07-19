@@ -6,13 +6,13 @@ const redis = Redis.fromEnv();
 
 export async function openDoor(callControlId: string) {
   console.log("opening door!");
-  await telnyx.calls
-    .sendDtmf(callControlId, {
-      digits: "9",
-      duration_millis: 400,
-    })
-    .then((res) => console.log("dtmf: ", res?.data?.result));
-  await telnyx.calls.hangup(callControlId, {});
+  // await telnyx.calls
+  //   .sendDtmf(callControlId, {
+  //     digits: "9",
+  //     duration_millis: 400,
+  //   })
+  //   .then((res) => console.log("dtmf: ", res?.data?.result));
+  // await telnyx.calls.hangup(callControlId, {});
 }
 
 export async function getAllPhrases() {
