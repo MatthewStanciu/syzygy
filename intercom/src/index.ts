@@ -8,6 +8,7 @@ import {
   resetPhrasesIfAllUsed,
   normalizeTextForMatching,
   openDoor,
+  isCloseMatch,
 } from "./lib/util";
 
 // Patch http.ClientRequest to handle undefined timeout values
@@ -102,10 +103,8 @@ app.post("/intercom", async (request, _res) => {
       console.log({ transcription });
 
       const allPhrases = await getAllPhrases();
-      const normalizedTranscript = normalizeTextForMatching(transcription);
-      console.log({ normalizedTranscript });
       const matchingPhrase = allPhrases.find((p) =>
-        normalizedTranscript.includes(normalizeTextForMatching(p.key))
+        isCloseMatch(p.key, transcription, 0.6)
       );
 
       if (matchingPhrase) {

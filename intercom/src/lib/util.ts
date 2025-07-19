@@ -63,3 +63,45 @@ export function normalizeTextForMatching(text: string): string {
   // Keep only alphanumeric characters
   return text.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
+
+export function calculateCharacterMatch(
+  phrase: string,
+  transcript: string
+): number {
+  if (phrase.length === 0) return 0;
+
+  let matchCount = 0;
+  const transcriptChars = transcript.split("");
+
+  for (const char of phrase) {
+    const index = transcriptChars.indexOf(char);
+    if (index !== -1) {
+      matchCount++;
+      transcriptChars.splice(index, 1); // Remove matched character to avoid double counting
+    }
+  }
+
+  return matchCount / phrase.length;
+}
+
+// This was written by Claude 4 D:
+export function isCloseMatch(
+  phrase: string,
+  transcript: string,
+  threshold: number = 0.6
+): boolean {
+  const normalizedPhrase = normalizeTextForMatching(phrase);
+  const normalizedTranscript = normalizeTextForMatching(transcript);
+
+  // First try exact substring match for efficiency
+  if (normalizedTranscript.includes(normalizedPhrase)) {
+    return true;
+  }
+
+  // Then try fuzzy matching
+  const similarity = calculateCharacterMatch(
+    normalizedPhrase,
+    normalizedTranscript
+  );
+  return similarity >= threshold;
+}
