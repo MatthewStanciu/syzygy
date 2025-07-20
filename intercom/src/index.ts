@@ -118,9 +118,11 @@ app.post("/intercom", async (request, _res) => {
           console.log("Phrase already used, hanging up");
           await telnyx.calls.hangup(callControlId, {});
         } else {
-          await openDoor(callControlId);
-          // await markPhraseAsUsed(matchingPhrase.key);
-          // await resetPhrasesIfAllUsed();
+          setTimeout(async () => {
+            await openDoor(callControlId);
+            // await markPhraseAsUsed(matchingPhrase.key);
+            // await resetPhrasesIfAllUsed();
+          }, 1000);
         }
       }
     } else if (call.data.event_type === "call.dtmf.received") {
