@@ -122,7 +122,7 @@ app.post("/intercom", async (request, _res) => {
             await openDoor(callControlId);
             // await markPhraseAsUsed(matchingPhrase.key);
             // await resetPhrasesIfAllUsed();
-          }, 1000);
+          }, 500);
         }
       }
     } else if (call.data.event_type === "call.dtmf.received") {
