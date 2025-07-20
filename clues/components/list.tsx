@@ -3,23 +3,25 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 
-export function List({ phrases }: { phrases: string[] }) {
-  const [ingredients, setIngredients] = useState<string[]>([]);
+const getRandomPhrase = (phrases: string[]) =>
+  phrases[Math.floor(Math.random() * phrases.length)];
+
+export function List({
+  phrases,
+  initialPhrase,
+}: {
+  phrases: string[];
+  initialPhrase: string;
+}) {
+  const [randomPhrase, setRandomPhrase] = useState(initialPhrase);
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between bg-black px-8 pb-32 pt-24 text-white">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-costar-white px-8 pb-32 pt-24 text-costar-gray">
       <div className="z-10 w-full max-w-sm items-center justify-between text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b  border-neutral-800 bg-zinc-800/30 bg-gradient-to-b from-inherit pb-4 pt-6 backdrop-blur-2xl lg:static lg:w-auto lg:rounded-xl lg:border lg:bg-gray-200 lg:bg-zinc-800/30 lg:p-4">
-          Purdue Hackers&nbsp;
-          <strong className="font-bold">Bar</strong>
-        </p>
-        <div className="pointer-events-none fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-black via-black pb-12 lg:static lg:h-auto lg:w-auto lg:bg-none lg:pb-0">
+        <div className="pointer-events-none fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-costar-white via-costar-white pb-12">
           <motion.button
             className="pointer-events-auto"
             onClick={() => {
-              const randomphrases = [...phrases]
-                .sort(() => Math.random() - Math.random())
-                .slice(0, 5);
-              setIngredients(randomphrases);
+              setRandomPhrase(getRandomPhrase(phrases));
             }}
             whileTap={{ scale: 0.9 }}
             whileHover={{ rotate: -180 }}
@@ -29,7 +31,7 @@ export function List({ phrases }: { phrases: string[] }) {
               width={48}
               height={48}
               viewBox="0 0 32 32"
-              className="fill-primary"
+              className="fill-costar-gray"
               xmlns="http://www.w3.org/2000/svg"
             >
               <path d="M6.70533 19.6863C6.94679 19.1719 7.16632 18.639 7.38413 18.1102C7.41062 18.0463 7.43702 17.9824 7.46338 17.9187C7.52401 17.772 7.58443 17.6259 7.64523 17.4811C7.84274 17.0089 8.37901 16.8042 8.83677 17.0366C9.28132 17.2622 9.47761 17.8132 9.28498 18.2727L9.28427 18.2739C9.19987 18.4767 9.11431 18.6829 9.02928 18.891L9.02779 18.8946C8.50296 20.171 7.94489 21.5283 7.11209 22.6161L7.11041 22.6176C6.95013 22.8231 6.724 23.0648 6.39945 23.1518C6.07587 23.2385 5.75818 23.1425 5.51664 23.0446L5.51541 23.0439C4.23026 22.5093 3.10832 21.6411 2.01636 20.796C1.8308 20.6521 1.64673 20.5099 1.46194 20.3689C1.06659 20.068 0.958901 19.4922 1.23204 19.0743C1.51225 18.6441 2.07932 18.5543 2.48622 18.8635C2.66707 19.0014 2.84721 19.1405 3.02613 19.2789L3.02762 19.2806C3.65953 19.7687 4.28773 20.254 4.94696 20.6684C2.60418 15.1659 4.6847 8.65442 9.99488 5.58858C14.3176 3.09286 19.5477 3.59226 23.282 6.4429L22.6747 7.23773L22.0675 8.03256C18.9555 5.65703 14.5971 5.24086 10.9949 7.32063C6.63416 9.83829 4.88702 15.1443 6.70533 19.6863Z" />
@@ -40,40 +42,15 @@ export function List({ phrases }: { phrases: string[] }) {
         </div>
       </div>
 
-      <ul className="mx-auto w-full max-w-sm">
-        {phrases.map((phrase) => (
-          <li
-            key={phrase}
-            className={`relative mb-4 px-6 py-1 text-center text-3xl`}
-          >
-            {ingredients.includes(phrase) && (
-              <motion.span
-                layoutId={`bubble-${ingredients.indexOf(phrase)}`}
-                className="bg-primary absolute inset-0 mix-blend-lighten"
-                style={{ borderRadius: 9999 }}
-                transition={{
-                  type: "spring",
-                  bounce: 0.2,
-                  duration: 0.6,
-                }}
-                initial={false}
-              />
-            )}
-            {phrase}
-          </li>
-        ))}
-      </ul>
-
-      <footer className="opacity-50">
-        by{" "}
-        <a
-          href="https://lachlanjc.com"
-          target="_blank"
-          rel="noopener noreferrer"
+      <div className="mx-auto w-full max-w-sm lg:max-w-xl">
+        <p
+          className={`relative mb-4 px-6 py-1 text-center text-balance text-3xl lg:text-5xl`}
         >
-          @lachlanjc
-        </a>
-      </footer>
+          {randomPhrase}
+        </p>
+      </div>
+
+      {/* <footer className="opacity-50">Text Matthew for help</footer> */}
     </main>
   );
 }

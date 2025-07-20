@@ -15,6 +15,11 @@ const config: Config = {
       },
       colors: {
         primary: "var(--color-primary)",
+        "costar-white": "var(--color-costar-white)",
+        "costar-gray": "var(--color-costar-gray)",
+      },
+      fontFamily: {
+        romana: ["var(--font-romanabt)", "sans-serif"],
       },
     },
   },

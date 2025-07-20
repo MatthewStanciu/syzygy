@@ -12,9 +12,10 @@ export default async function Home() {
     const phrases = await fetch(`${baseUrl}/api/phrases`, {
       next: { revalidate: 30 },
     }).then((r) => r.json());
+    const initialPhrase = phrases[Math.floor(Math.random() * phrases.length)];
 
     console.log("phrases!", phrases);
-    return <List phrases={phrases} />;
+    return <List phrases={phrases} initialPhrase={initialPhrase} />;
   } catch (err: any) {
     return <p>fetch failed: {err.toString()}</p>;
   }
