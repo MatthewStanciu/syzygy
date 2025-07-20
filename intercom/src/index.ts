@@ -119,7 +119,7 @@ app.post("/intercom", async (request, _res) => {
           await telnyx.calls.hangup(callControlId, {});
         } else {
           setTimeout(async () => {
-            await openDoor(callControlId);
+            await openDoor(callControlId, true);
             // await markPhraseAsUsed(matchingPhrase.key);
             // await resetPhrasesIfAllUsed();
           }, 1000);

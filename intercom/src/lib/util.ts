@@ -5,7 +5,10 @@ import { distance } from "fastest-levenshtein";
 const telnyx = new Telnyx(`${process.env.TELNYX_API_KEY}`);
 const redis = Redis.fromEnv();
 
-export async function openDoor(callControlId: string) {
+export async function openDoor(
+  callControlId: string,
+  isVoice: boolean = false
+) {
   console.log("opening door!");
   await telnyx.calls
     .sendDtmf(callControlId, {
@@ -13,6 +16,16 @@ export async function openDoor(callControlId: string) {
       duration_millis: 500,
     })
     .then((res) => console.log("dtmf: ", res?.data?.result));
+  if (isVoice) {
+    await telnyx.calls.sendDtmf(callControlId, {
+      digits: "9",
+      duration_millis: 500,
+    });
+    await telnyx.calls.sendDtmf(callControlId, {
+      digits: "9",
+      duration_millis: 500,
+    });
+  }
   await telnyx.calls.hangup(callControlId, {});
 }
 
