@@ -12,21 +12,14 @@ export async function openDoor(
   console.log("opening door!");
   await telnyx.calls
     .sendDtmf(callControlId, {
-      digits: "9",
+      digits: "99",
       duration_millis: 500,
     })
-    .then((res) => console.log("dtmf: ", res?.data?.result));
-  if (isVoice) {
-    await telnyx.calls.sendDtmf(callControlId, {
-      digits: "9",
-      duration_millis: 500,
-    });
-    await telnyx.calls.sendDtmf(callControlId, {
-      digits: "9",
-      duration_millis: 500,
-    });
-  }
-  await telnyx.calls.hangup(callControlId, {});
+    .then((res) => console.log("dtmf: ", res?.data));
+  setTimeout(async () => {
+    console.log("hanging up");
+    await telnyx.calls.hangup(callControlId, {});
+  }, 3000);
 }
 
 export async function getAllPhrases() {
