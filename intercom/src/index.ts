@@ -53,6 +53,8 @@ app.get("/intercom", async (request, _response) => {
 app.use("/public/*", serveStatic({ root: "./" }));
 app.get("/beep.mp3", serveStatic({ path: "./public/beep.mp3" }));
 
+const transfer = true;
+
 app.post("/intercom", async (request, _res) => {
   const call = (await request.req.json()) as CallControlEvent;
   console.log({ call });
@@ -65,19 +67,89 @@ app.post("/intercom", async (request, _res) => {
     if (call.data.event_type === "call.hangup") {
       console.log("Call has ended.");
     } else if (call.data.event_type === "call.initiated") {
-      console.log("initiated");
-      telnyx.calls.answer(callControlId, {
-        webhook_url_method: "POST",
-        stream_track: "inbound_track",
-        send_silence_when_idle: false,
-        transcription: false,
-        record_channels: "single",
-        record_format: "wav",
-        record_timeout_secs: 0,
-        record_track: "both",
-        record_max_length: 600,
-      });
+      const direction = call.data.payload?.direction;
+      if (!direction || direction === "incoming") {
+        console.log("initiated");
+        telnyx.calls.answer(callControlId, {
+          webhook_url_method: "POST",
+          stream_track: "inbound_track",
+          send_silence_when_idle: false,
+          transcription: false,
+          record_channels: "single",
+          record_format: "wav",
+          record_timeout_secs: 0,
+          record_track: "both",
+          record_max_length: 600,
+        });
+      }
     } else if (call.data.event_type === "call.answered") {
+      if (transfer) {
+        // hazel: 18123498027
+        // lachlan: 18144048493
+        // const forwardDial = await telnyx.calls.dial({
+        //   to: "+18123498027",
+        //   from: "+14155491627",
+        //   connection_id: "2741775806907811527",
+        //   timeout_secs: 30,
+        //   time_limit_secs: 14400,
+        //   answering_machine_detection: "disabled",
+        //   bridge_intent: true,
+        //   link_to: callControlId,
+        //   media_encryption: "disabled",
+        //   sip_transport_protocol: "UDP",
+        //   stream_track: "both_tracks",
+        //   stream_establish_before_call_originate: false,
+        //   send_silence_when_idle: false,
+        //   webhook_url_method: "POST",
+        //   record_channels: "dual",
+        //   record_format: "mp3",
+        //   record_max_length: 0,
+        //   record_timeout_secs: 0,
+        //   record_track: "both",
+        //   supervisor_role: "barge",
+        //   enable_dialogflow: false,
+        //   transcription: false,
+        // });
+        // const forwardCallControlId = forwardDial.data?.call_control_id;
+        // if (forwardCallControlId) {
+        //   console.log({ forwardCallControlId });
+        //   await telnyx.calls
+        //     .bridge(callControlId, {
+        //       call_control_id: forwardCallControlId,
+        //       play_ringtone: false,
+        //       ringtone: "us",
+        //       record_channels: "dual",
+        //       record_format: "mp3",
+        //       record_max_length: 0,
+        //       record_timeout_secs: 0,
+        //       record_track: "both",
+        //       mute_dtmf: "none",
+        //     })
+        //     .catch((err) => "error bridging: " + err.message);
+        // }
+        // return request.json({ status: "success" });
+
+        await telnyx.calls
+          .transfer(callControlId, {
+            to: "+18123498027",
+            early_media: false,
+            timeout_secs: 30,
+            time_limit_secs: 14400,
+            mute_dtmf: "none",
+            answering_machine_detection: "disabled",
+            sip_transport_protocol: "UDP",
+            media_encryption: "disabled",
+            webhook_url_method: "POST",
+          })
+          .catch(
+            (err: Error) =>
+              `error transferring call: ${
+                (err.cause, err.message, err.name, err.stack)
+              }`
+          );
+        return request.json({ status: "success" });
+      }
+
       console.log("call answered, playing beep");
       telnyx.calls
         .playbackStart(callControlId, {
