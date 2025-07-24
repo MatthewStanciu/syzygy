@@ -91,7 +91,7 @@ app.post("/intercom", async (request, _res) => {
         if (await shouldForwardCall()) {
           await telnyx.calls
             .transfer(callControlId, {
-              to: "+15102243879",
+              to: `${process.env.MY_PHONE_NUMBER}`,
               early_media: true,
               timeout_secs: 30,
               time_limit_secs: 14400,
