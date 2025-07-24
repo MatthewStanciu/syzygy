@@ -131,7 +131,6 @@ app.post("/intercom", async (request, _res) => {
     } else if (call.data.event_type === "call.transcription") {
       const transcriptionData = call.data.payload!
         .transcription_data as TranscriptionData;
-      // console.log(transcriptionData);
       const transcription = transcriptionData.transcript.trim().toLowerCase();
       console.log({ transcription });
 
