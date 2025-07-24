@@ -123,11 +123,13 @@ app.post("/intercom", async (request, _res) => {
           .catch((err) => console.error("failed to play beep", err));
       }
     } else if (call.data.event_type === "call.playback.ended") {
-      // After beep sound ends, listen for & parse passphrase
-      telnyx.calls.transcriptionStart(callControlId, {
-        transcription_engine: "A",
-        transcription_tracks: "inbound",
-      });
+      if (call.data.payload?.media_url === "https://doggo.ninja/yeLcOA.mp3") {
+        // After beep sound ends, listen for & parse passphrase
+        telnyx.calls.transcriptionStart(callControlId, {
+          transcription_engine: "A",
+          transcription_tracks: "inbound",
+        });
+      }
     } else if (call.data.event_type === "call.transcription") {
       const transcriptionData = call.data.payload!
         .transcription_data as TranscriptionData;
@@ -153,6 +155,22 @@ app.post("/intercom", async (request, _res) => {
           await openDoor(callControlId, true);
           // await markPhraseAsUsed(matchingPhrase.key);
           // await resetPhrasesIfAllUsed();
+        }
+      } else {
+        if (transcription.split(" ").length >= 3) {
+          console.log(
+            "phrase not recognized, playing extremely loud incorrect buzzer"
+          );
+          telnyx.calls
+            .playbackStart(callControlId, {
+              audio_url: "https://doggo.ninja/DJdRcR.mp3",
+              loop: 1,
+              overlay: false,
+              target_legs: "self",
+              cache_audio: true,
+              audio_type: "mp3",
+            })
+            .catch((err) => console.error("failed to play buzzer", err));
         }
       }
     } else if (call.data.event_type === "call.dtmf.received") {
