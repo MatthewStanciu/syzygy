@@ -23,7 +23,7 @@ export async function openDoor(
 }
 
 export async function getAllPhrases() {
-  const keys = await redis.keys("*"); // it's only like 50 so this should be fine
+  const keys = (await redis.keys("*")).filter((key) => key !== "flags"); // it's only like 50 so this should be fine
   const phrasePairs = await Promise.all(
     keys.map(async (key) => ({
       key,
@@ -32,6 +32,18 @@ export async function getAllPhrases() {
   );
 
   return phrasePairs;
+}
+
+type IntercomFlags = {
+  forwardCall: boolean;
+};
+export async function shouldForwardCall() {
+  const flags = (await redis.json
+    .get("flags")
+    .catch(
+      (err) => "failed to get flag from redis: " + err.message
+    )) as IntercomFlags;
+  return flags.forwardCall;
 }
 
 export async function markPhraseAsUsed(phrase: string) {

@@ -5,7 +5,7 @@ const redis = Redis.fromEnv();
 
 export async function GET() {
   try {
-    const keys = await redis.keys("*");
+    const keys = (await redis.keys("*")).filter((key) => key !== "flags");
     return NextResponse.json(keys);
   } catch (error) {
     console.error("Error fetching phrases:", error);

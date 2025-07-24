@@ -9,6 +9,8 @@ import {
   normalizeTextForMatching,
   openDoor,
   isCloseMatch,
+  shouldForwardCall,
+  shouldForwardCall,
 } from "./lib/util";
 
 // Patch http.ClientRequest to handle undefined timeout values
@@ -53,8 +55,6 @@ app.get("/intercom", async (request, _response) => {
 app.use("/public/*", serveStatic({ root: "./" }));
 app.get("/beep.mp3", serveStatic({ path: "./public/beep.mp3" }));
 
-const transfer = true;
-
 app.post("/intercom", async (request, _res) => {
   const call = (await request.req.json()) as CallControlEvent;
   console.log({ call });
@@ -88,7 +88,7 @@ app.post("/intercom", async (request, _res) => {
       console.log("to: ", call.data.payload?.to);
 
       if (to && to === "+14155491627") {
-        if (transfer) {
+        if (await shouldForwardCall()) {
           await telnyx.calls
             .transfer(callControlId, {
               to: "+15102243879",
