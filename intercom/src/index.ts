@@ -9,6 +9,8 @@ import {
   normalizeTextForMatching,
   openDoor,
   isCloseMatch,
+  shouldForwardCall,
+  shouldForwardCall,
 } from "./lib/util";
 
 // Patch http.ClientRequest to handle undefined timeout values
@@ -65,30 +67,61 @@ app.post("/intercom", async (request, _res) => {
     if (call.data.event_type === "call.hangup") {
       console.log("Call has ended.");
     } else if (call.data.event_type === "call.initiated") {
-      console.log("initiated");
-      telnyx.calls.answer(callControlId, {
-        webhook_url_method: "POST",
-        stream_track: "inbound_track",
-        send_silence_when_idle: false,
-        transcription: false,
-        record_channels: "single",
-        record_format: "wav",
-        record_timeout_secs: 0,
-        record_track: "both",
-        record_max_length: 600,
-      });
+      const to = call.data.payload?.to;
+
+      if (to && to === "+14155491627") {
+        console.log("initiated");
+        telnyx.calls.answer(callControlId, {
+          webhook_url_method: "POST",
+          stream_track: "inbound_track",
+          send_silence_when_idle: false,
+          transcription: false,
+          record_channels: "single",
+          record_format: "wav",
+          record_timeout_secs: 0,
+          record_track: "both",
+          record_max_length: 600,
+        });
+      }
     } else if (call.data.event_type === "call.answered") {
-      console.log("call answered, playing beep");
-      telnyx.calls
-        .playbackStart(callControlId, {
-          audio_url: "https://doggo.ninja/yeLcOA.mp3",
-          loop: 1,
-          overlay: false,
-          target_legs: "self",
-          cache_audio: true,
-          audio_type: "mp3",
-        })
-        .catch((err) => console.error("failed to play beep", err));
+      const to = call.data.payload?.to;
+      console.log("to: ", call.data.payload?.to);
+
+      if (to && to === "+14155491627") {
+        if (await shouldForwardCall()) {
+          await telnyx.calls
+            .transfer(callControlId, {
+              to: `${process.env.MY_PHONE_NUMBER}`,
+              early_media: true,
+              timeout_secs: 30,
+              time_limit_secs: 14400,
+              mute_dtmf: "none",
+              answering_machine_detection: "disabled",
+              sip_transport_protocol: "UDP",
+              media_encryption: "disabled",
+              webhook_url_method: "POST",
+            })
+            .catch(
+              (err: Error) =>
+                `error transferring call: ${
+                  (err.cause, err.message, err.name, err.stack)
+                }`
+            );
+          return request.json({ status: "success" });
+        }
+
+        console.log("call answered, playing beep");
+        telnyx.calls
+          .playbackStart(callControlId, {
+            audio_url: "https://doggo.ninja/yeLcOA.mp3",
+            loop: 1,
+            overlay: false,
+            target_legs: "self",
+            cache_audio: true,
+            audio_type: "mp3",
+          })
+          .catch((err) => console.error("failed to play beep", err));
+      }
     } else if (call.data.event_type === "call.playback.ended") {
       // After beep sound ends, listen for & parse passphrase
       telnyx.calls.transcriptionStart(callControlId, {
