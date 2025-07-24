@@ -6,10 +6,8 @@ import {
   getAllPhrases,
   markPhraseAsUsed,
   resetPhrasesIfAllUsed,
-  normalizeTextForMatching,
   openDoor,
   isCloseMatch,
-  shouldForwardCall,
   shouldForwardCall,
 } from "./lib/util";
 
