@@ -67,8 +67,9 @@ app.post("/intercom", async (request, _res) => {
     if (call.data.event_type === "call.hangup") {
       console.log("Call has ended.");
     } else if (call.data.event_type === "call.initiated") {
-      const direction = call.data.payload?.direction;
-      if (!direction || direction === "incoming") {
+      const to = call.data.payload?.to;
+
+      if (to && to === "+14155491627") {
         console.log("initiated");
         telnyx.calls.answer(callControlId, {
           webhook_url_method: "POST",
@@ -83,84 +84,94 @@ app.post("/intercom", async (request, _res) => {
         });
       }
     } else if (call.data.event_type === "call.answered") {
-      if (transfer) {
-        // hazel: 18123498027
-        // lachlan: 18144048493
-        // const forwardDial = await telnyx.calls.dial({
-        //   to: "+18123498027",
-        //   from: "+14155491627",
-        //   connection_id: "2741775806907811527",
-        //   timeout_secs: 30,
-        //   time_limit_secs: 14400,
-        //   answering_machine_detection: "disabled",
-        //   bridge_intent: true,
-        //   link_to: callControlId,
-        //   media_encryption: "disabled",
-        //   sip_transport_protocol: "UDP",
-        //   stream_track: "both_tracks",
-        //   stream_establish_before_call_originate: false,
-        //   send_silence_when_idle: false,
-        //   webhook_url_method: "POST",
-        //   record_channels: "dual",
-        //   record_format: "mp3",
-        //   record_max_length: 0,
-        //   record_timeout_secs: 0,
-        //   record_track: "both",
-        //   supervisor_role: "barge",
-        //   enable_dialogflow: false,
-        //   transcription: false,
-        // });
-        // const forwardCallControlId = forwardDial.data?.call_control_id;
-        // if (forwardCallControlId) {
-        //   console.log({ forwardCallControlId });
-        //   await telnyx.calls
-        //     .bridge(callControlId, {
-        //       call_control_id: forwardCallControlId,
-        //       play_ringtone: false,
-        //       ringtone: "us",
-        //       record_channels: "dual",
-        //       record_format: "mp3",
-        //       record_max_length: 0,
-        //       record_timeout_secs: 0,
-        //       record_track: "both",
-        //       mute_dtmf: "none",
-        //     })
-        //     .catch((err) => "error bridging: " + err.message);
-        // }
-        // return request.json({ status: "success" });
+      const to = call.data.payload?.to;
+      console.log("to: ", call.data.payload?.to);
 
-        await telnyx.calls
-          .transfer(callControlId, {
-            to: "+18123498027",
-            early_media: false,
-            timeout_secs: 30,
-            time_limit_secs: 14400,
-            mute_dtmf: "none",
-            answering_machine_detection: "disabled",
-            sip_transport_protocol: "UDP",
-            media_encryption: "disabled",
-            webhook_url_method: "POST",
+      // if (to && to === "+15102243879") {
+      //   console.log({ forwardCallControlId });
+      //   await telnyx.calls
+      //     .bridge(callControlId, {
+      //       call_control_id: forwardCallControlId,
+      //       play_ringtone: false,
+      //       ringtone: "us",
+      //       record_channels: "dual",
+      //       record_format: "mp3",
+      //       record_max_length: 0,
+      //       record_timeout_secs: 0,
+      //       record_track: "both",
+      //       mute_dtmf: "none",
+      //     })
+      //     .catch((err) => "error bridging: " + err.message);
+      // }
+      if (to && to === "+14155491627") {
+        if (transfer) {
+          // hazel: 18123498027
+          // lachlan: 18144048493
+          // google voice: 15102243879
+
+          // const forwardDial = await telnyx.calls.dial({
+          //   to: "+15102243879",
+          //   from: "+14155491627",
+          //   connection_id: "2741775806907811527",
+          //   timeout_secs: 30,
+          //   time_limit_secs: 14400,
+          //   answering_machine_detection: "disabled",
+          //   bridge_intent: true,
+          //   link_to: callControlId,
+          //   media_encryption: "disabled",
+          //   sip_transport_protocol: "UDP",
+          //   stream_track: "both_tracks",
+          //   stream_establish_before_call_originate: true,
+          //   send_silence_when_idle: false,
+          //   webhook_url_method: "POST",
+          //   record_channels: "dual",
+          //   record_format: "mp3",
+          //   record_max_length: 0,
+          //   record_timeout_secs: 0,
+          //   record_track: "both",
+          //   supervisor_role: "barge",
+          //   enable_dialogflow: false,
+          //   transcription: false,
+          // });
+          // if (forwardDial.data?.call_control_id) {
+          //   forwardCallControlId = forwardDial.data?.call_control_id;
+          //   console.log({ forwardCallControlId });
+          // }
+          // return request.json({ status: "success" });
+
+          await telnyx.calls
+            .transfer(callControlId, {
+              to: "+15102243879",
+              early_media: true,
+              timeout_secs: 30,
+              time_limit_secs: 14400,
+              mute_dtmf: "none",
+              answering_machine_detection: "disabled",
+              sip_transport_protocol: "UDP",
+              media_encryption: "disabled",
+              webhook_url_method: "POST",
+            })
+            .catch(
+              (err: Error) =>
+                `error transferring call: ${
+                  (err.cause, err.message, err.name, err.stack)
+                }`
+            );
+          return request.json({ status: "success" });
+        }
+
+        console.log("call answered, playing beep");
+        telnyx.calls
+          .playbackStart(callControlId, {
+            audio_url: "https://doggo.ninja/yeLcOA.mp3",
+            loop: 1,
+            overlay: false,
+            target_legs: "self",
+            cache_audio: true,
+            audio_type: "mp3",
           })
-          .catch(
-            (err: Error) =>
-              `error transferring call: ${
-                (err.cause, err.message, err.name, err.stack)
-              }`
-          );
-        return request.json({ status: "success" });
+          .catch((err) => console.error("failed to play beep", err));
       }
-
-      console.log("call answered, playing beep");
-      telnyx.calls
-        .playbackStart(callControlId, {
-          audio_url: "https://doggo.ninja/yeLcOA.mp3",
-          loop: 1,
-          overlay: false,
-          target_legs: "self",
-          cache_audio: true,
-          audio_type: "mp3",
-        })
-        .catch((err) => console.error("failed to play beep", err));
     } else if (call.data.event_type === "call.playback.ended") {
       // After beep sound ends, listen for & parse passphrase
       telnyx.calls.transcriptionStart(callControlId, {
