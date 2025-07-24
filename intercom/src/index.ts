@@ -151,7 +151,6 @@ app.post("/intercom", async (request, _res) => {
           console.log("Phrase already used, hanging up");
           await telnyx.calls.hangup(callControlId, {});
         } else {
-          await telnyx.calls.transcriptionStop(callControlId, {});
           await openDoor(callControlId, true);
           // await markPhraseAsUsed(matchingPhrase.key);
           // await resetPhrasesIfAllUsed();
