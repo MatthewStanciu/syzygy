@@ -1,6 +1,10 @@
 import { Redis } from "@upstash/redis";
 import Telnyx from "telnyx";
 import { distance } from "fastest-levenshtein";
+import { OpenAI } from "openai";
+import { Writable } from "stream";
+import wav from "wav";
+import { createReadStream, unlinkSync, writeFileSync } from "fs";
 
 const telnyx = new Telnyx(`${process.env.TELNYX_API_KEY}`);
 const redis = Redis.fromEnv();
@@ -98,4 +102,94 @@ export function isCloseMatch(
     distance(normalizedPhrase, normalizedTranscript) <=
     normalizedPhrase.length * threshold
   );
+}
+
+export function avgAmplitude(buffer: Buffer) {
+  let sum = 0,
+    n = buffer.length / 2;
+  for (let i = 0; i < buffer.length; i += 2) {
+    sum += Math.abs(buffer.readInt16LE(i));
+  }
+  return sum / n;
+}
+
+export function rollingAverage(arr: any) {
+  if (!arr.length) return 0;
+  return arr.reduce((a: any, b: any) => a + b, 0) / arr.length;
+}
+
+export function isChunkSilent(buffer: Buffer, silenceThreshold = 300) {
+  // buffer: PCM 16-bit LE
+  let sum = 0,
+    samples = buffer.length / 2;
+  for (let i = 0; i < buffer.length; i += 2) {
+    let sample = buffer.readInt16LE(i);
+    sum += Math.abs(sample);
+  }
+  const avg = sum / samples;
+  // silenceThreshold: adjust for your environment!
+  return avg < silenceThreshold;
+}
+
+export function amplifyPCM(buffer: Buffer, gain: number) {
+  // buffer: Node.js Buffer of 16-bit signed PCM (l16)
+  const amplified = Buffer.alloc(buffer.length);
+  for (let i = 0; i < buffer.length; i += 2) {
+    let sample = buffer.readInt16LE(i) * gain;
+    // Clamp to valid 16-bit range
+    sample = Math.max(-32768, Math.min(32767, Math.round(sample)));
+    amplified.writeInt16LE(sample, i);
+  }
+  return amplified;
+}
+
+export async function flushBuffer(audioBuffers: any, streamId: number) {
+  const state = audioBuffers[streamId];
+  if (!state || state.buf.length === 0) return;
+  // Combine all PCM chunks into one Buffer for Whisper
+  const combined = Buffer.concat(state.buf);
+  state.buf = [];
+  console.log("Ready to transcribe buffer of length", combined.length);
+
+  try {
+    const transcript = await transcribeWithWhisper(combined);
+    console.log(`Transcript: ${transcript}`);
+    // TODO: Fuzzy matching and openDoor logic here!
+  } catch (e) {
+    console.error("Error running Whisper:", e);
+  }
+}
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+async function transcribeWithWhisper(pcmBuffer: Buffer) {
+  // Encode as WAV (PCM 16-bit, 1 channel, 16 kHz or 8 kHz)
+  const wavBuffer = await pcmToWav(pcmBuffer);
+  // Save to tmp file (OpenAI Whisper API uses file upload)
+  // const tmpPath = `/tmp/chunk-${Date.now()}.wav`;
+  const tmpPath = `./${Date.now()}.wav`;
+  writeFileSync(tmpPath, wavBuffer);
+  // Call Whisper
+  const resp = await openai.audio.transcriptions.create({
+    file: createReadStream(tmpPath),
+    model: "whisper-1",
+  });
+  // Clean up
+  // unlinkSync(tmpPath);
+  return resp.text; // This is your transcription
+}
+function pcmToWav(pcmBuffer: Buffer): Promise<Buffer> {
+  // Defaults: 16000 Hz, 1 channel, 16 bits
+  return new Promise((resolve, reject) => {
+    const writer = new wav.Writer({
+      channels: 1,
+      sampleRate: 16000,
+      bitDepth: 16,
+    });
+    let buffers: Buffer[] = [];
+    writer.on("data", (d: Buffer) => buffers.push(d));
+    writer.on("finish", () => resolve(Buffer.concat(buffers)));
+    writer.on("error", reject);
+    writer.end(pcmBuffer);
+  });
 }

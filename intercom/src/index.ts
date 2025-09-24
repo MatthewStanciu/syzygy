@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { serveStatic } from "@hono/node-server/serve-static";
+import { upgradeWebSocket, websocket } from "hono/bun";
 import Telnyx from "telnyx";
 import * as http from "http";
 import {
@@ -9,6 +10,11 @@ import {
   openDoor,
   isCloseMatch,
   shouldForwardCall,
+  amplifyPCM,
+  flushBuffer,
+  isChunkSilent,
+  rollingAverage,
+  avgAmplitude,
 } from "./lib/util";
 
 // Patch http.ClientRequest to handle undefined timeout values
@@ -72,6 +78,8 @@ app.post("/intercom", async (request, _res) => {
         telnyx.calls.answer(callControlId, {
           webhook_url_method: "POST",
           stream_track: "inbound_track",
+          stream_url: "wss://428cf086f998.ngrok-free.app/media-stream",
+          stream_bidirectional_codec: "L16",
           send_silence_when_idle: false,
           transcription: false,
           record_channels: "single",
@@ -129,48 +137,44 @@ app.post("/intercom", async (request, _res) => {
         });
       }
     } else if (call.data.event_type === "call.transcription") {
-      const transcriptionData = call.data.payload!
-        .transcription_data as TranscriptionData;
-      const transcription = transcriptionData.transcript.trim().toLowerCase();
-      console.log({ transcription });
-
-      const allPhrases = await getAllPhrases();
-      const matchingPhrase = allPhrases.find((p) =>
-        isCloseMatch(p.key, transcription, 0.45)
-      );
-
-      if (matchingPhrase) {
-        console.log("Phrase recognized:", matchingPhrase.key);
-
-        const isUsed =
-          matchingPhrase.value &&
-          !isNaN(new Date(matchingPhrase.value as string).getTime());
-
-        if (isUsed) {
-          console.log("Phrase already used, hanging up");
-          await telnyx.calls.hangup(callControlId, {});
-        } else {
-          await openDoor(callControlId);
-          // await markPhraseAsUsed(matchingPhrase.key);
-          // await resetPhrasesIfAllUsed();
-        }
-      } else {
-        if (transcription.split(" ").length >= 3) {
-          console.log(
-            "phrase not recognized, playing extremely loud incorrect buzzer"
-          );
-          // telnyx.calls
-          //   .playbackStart(callControlId, {
-          //     audio_url: "https://doggo.ninja/DJdRcR.mp3",
-          //     loop: 1,
-          //     overlay: false,
-          //     target_legs: "self",
-          //     cache_audio: true,
-          //     audio_type: "mp3",
-          //   })
-          //   .catch((err) => console.error("failed to play buzzer", err));
-        }
-      }
+      // const transcriptionData = call.data.payload!
+      //   .transcription_data as TranscriptionData;
+      // const transcription = transcriptionData.transcript.trim().toLowerCase();
+      // console.log({ transcription });
+      // const allPhrases = await getAllPhrases();
+      // const matchingPhrase = allPhrases.find((p) =>
+      //   isCloseMatch(p.key, transcription, 0.45)
+      // );
+      // if (matchingPhrase) {
+      //   console.log("Phrase recognized:", matchingPhrase.key);
+      //   const isUsed =
+      //     matchingPhrase.value &&
+      //     !isNaN(new Date(matchingPhrase.value as string).getTime());
+      //   if (isUsed) {
+      //     console.log("Phrase already used, hanging up");
+      //     await telnyx.calls.hangup(callControlId, {});
+      //   } else {
+      //     await openDoor(callControlId);
+      //     // await markPhraseAsUsed(matchingPhrase.key);
+      //     // await resetPhrasesIfAllUsed();
+      //   }
+      // } else {
+      //   if (transcription.split(" ").length >= 3) {
+      //     console.log(
+      //       "phrase not recognized, playing extremely loud incorrect buzzer"
+      //     );
+      //     // telnyx.calls
+      //     //   .playbackStart(callControlId, {
+      //     //     audio_url: "https://doggo.ninja/DJdRcR.mp3",
+      //     //     loop: 1,
+      //     //     overlay: false,
+      //     //     target_legs: "self",
+      //     //     cache_audio: true,
+      //     //     audio_type: "mp3",
+      //     //   })
+      //     //   .catch((err) => console.error("failed to play buzzer", err));
+      //   }
+      // }
     } else if (call.data.event_type === "call.dtmf.received") {
       console.log(call.data.payload);
       const digit = call.data.payload!.digit as string;
@@ -193,4 +197,89 @@ app.post("/intercom", async (request, _res) => {
   }
 });
 
-export default app;
+app.get(
+  "/media-stream",
+  upgradeWebSocket((c) => {
+    const audioBuffers: any = {};
+    const SAMPLE_WINDOW_MS = 1000; // Rolling window to judge for silence
+    const CHUNK_MS = 20; // Approx ms per audio chunk (adjust for your stream)
+    const WINDOW_SIZE = Math.ceil(SAMPLE_WINDOW_MS / CHUNK_MS); // e.g. 50 for 1s window
+    // TUNE THIS: Silence threshold depends on your system/environment
+    const SILENCE_THRESHOLD = 10000; // tweak between 100-1000
+
+    return {
+      async onMessage(event, ws) {
+        // console.log(`Message from client: ${event.data}`);
+        let raw = event.data;
+
+        // Handle Blob or Buffer or string
+        if (raw instanceof Blob) {
+          raw = await raw.text(); // works in Bun/Browsers
+        } else if (raw instanceof Uint8Array) {
+          raw = Buffer.from(raw).toString("utf8");
+        } else if (typeof raw !== "string") {
+          raw = String(raw); // fallback
+        }
+
+        let msg;
+        try {
+          msg = JSON.parse(raw);
+        } catch (e) {
+          console.warn("Not JSON from Telnyx:", raw);
+          return;
+        }
+
+        if (msg.event !== "media" || !msg.media || !msg.media.payload) return;
+
+        const { stream_id, media } = msg;
+        const { payload } = media;
+        const pcmChunk = Buffer.from(payload, "base64");
+        const gain = 1.0;
+        // const amplifiedChunk = amplifyPCM(pcmChunk, gain);
+        const amplifiedChunk = pcmChunk;
+
+        // Set up state for this stream_id
+        if (!audioBuffers[stream_id]) {
+          audioBuffers[stream_id] = { buf: [], ampWindow: [] };
+        }
+        const state = audioBuffers[stream_id];
+        state.buf.push(amplifiedChunk);
+
+        // Analyze amplitude
+        const amplitude = avgAmplitude(amplifiedChunk);
+        state.ampWindow.push(amplitude);
+        if (state.ampWindow.length > WINDOW_SIZE) state.ampWindow.shift(); // keep only latest WINDOW_SIZE
+
+        // Every chunk, check rolling average
+        const avg = rollingAverage(state.ampWindow);
+
+        // DEBUG: Print avg for a sense of scale
+        console.log(`[${stream_id}] rolling avg amplitude: ${avg.toFixed(1)}`);
+
+        // Only flush if we have buffered something and it's now "quiet"
+        if (
+          avg < SILENCE_THRESHOLD &&
+          !state.inSilence &&
+          state.buf.length > 0 &&
+          state.ampWindow.length === WINDOW_SIZE
+        ) {
+          flushBuffer(audioBuffers, stream_id);
+          state.inSilence = true;
+          // Optionally, clear out the window to avoid repeated flushes for the same pause
+          state.ampWindow.length = 0;
+        }
+        if (avg >= SILENCE_THRESHOLD) {
+          state.inSilence = false;
+        }
+      },
+      onClose: () => {
+        console.log("Connection closed");
+      },
+    };
+  })
+);
+
+export default {
+  fetch: app.fetch,
+  websocket,
+};
