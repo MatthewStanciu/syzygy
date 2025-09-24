@@ -150,7 +150,7 @@ app.post("/intercom", async (request, _res) => {
           console.log("Phrase already used, hanging up");
           await telnyx.calls.hangup(callControlId, {});
         } else {
-          await openDoor(callControlId, true);
+          await openDoor(callControlId);
           // await markPhraseAsUsed(matchingPhrase.key);
           // await resetPhrasesIfAllUsed();
         }
@@ -159,16 +159,16 @@ app.post("/intercom", async (request, _res) => {
           console.log(
             "phrase not recognized, playing extremely loud incorrect buzzer"
           );
-          telnyx.calls
-            .playbackStart(callControlId, {
-              audio_url: "https://doggo.ninja/DJdRcR.mp3",
-              loop: 1,
-              overlay: false,
-              target_legs: "self",
-              cache_audio: true,
-              audio_type: "mp3",
-            })
-            .catch((err) => console.error("failed to play buzzer", err));
+          // telnyx.calls
+          //   .playbackStart(callControlId, {
+          //     audio_url: "https://doggo.ninja/DJdRcR.mp3",
+          //     loop: 1,
+          //     overlay: false,
+          //     target_legs: "self",
+          //     cache_audio: true,
+          //     audio_type: "mp3",
+          //   })
+          //   .catch((err) => console.error("failed to play buzzer", err));
         }
       }
     } else if (call.data.event_type === "call.dtmf.received") {

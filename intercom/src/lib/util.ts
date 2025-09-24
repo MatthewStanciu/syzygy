@@ -7,12 +7,11 @@ const redis = Redis.fromEnv();
 
 export async function openDoor(callControlId: string) {
   console.log("opening door!");
-  await telnyx.calls
-    .sendDtmf(callControlId, {
-      digits: "99",
-      duration_millis: 500,
-    })
-    .then((res) => console.log("dtmf: ", res?.data));
+  await telnyx.calls.sendDtmf(callControlId, {
+    digits: "999999999999999999999999999999",
+    duration_millis: 100,
+  });
+
   setTimeout(async () => {
     console.log("hanging up");
     await telnyx.calls.hangup(callControlId, {});
