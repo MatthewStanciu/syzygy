@@ -26,7 +26,7 @@ http.ClientRequest.prototype.setTimeout = function (
 };
 
 // Initialize Telnyx client
-const telnyx = new Telnyx(`${process.env.TELNYX_API_KEY}`);
+const telnyx = new Telnyx({ apiKey: `${process.env.TELNYX_API_KEY}` });
 const app = new Hono();
 
 const codeDigits: string[] = [];
@@ -38,13 +38,13 @@ type TranscriptionData = {
 };
 
 type CallControlEvent =
-  | Telnyx.events.CallHangupEvent
-  | Telnyx.events.CallInitiatedEvent
-  | Telnyx.events.CallAnsweredEvent
-  | Telnyx.events.CallSpeakEndedEvent
-  | Telnyx.events.TranscriptionEvent
-  | Telnyx.events.CallDtmfReceivedEvent
-  | Telnyx.events.CallPlaybackEndedEvent;
+  | Telnyx.CallHangupWebhookEvent
+  | Telnyx.CallInitiatedWebhookEvent
+  | Telnyx.CallAnsweredWebhookEvent
+  | Telnyx.CallSpeakEndedWebhookEvent
+  | Telnyx.TranscriptionWebhookEvent
+  | Telnyx.CallDtmfReceivedWebhookEvent
+  | Telnyx.CallPlaybackEndedWebhookEvent;
 
 app.get("/intercom", async (request, _response) => {
   return request.html(`<h1>hi</h1>`);
@@ -69,7 +69,7 @@ app.post("/intercom", async (request, _res) => {
 
       if (to && to === "+14155491627") {
         console.log("initiated");
-        telnyx.calls.answer(callControlId, {
+        telnyx.calls.actions.answer(callControlId, {
           webhook_url_method: "POST",
           stream_track: "inbound_track",
           send_silence_when_idle: false,
@@ -87,7 +87,7 @@ app.post("/intercom", async (request, _res) => {
 
       if (to && to === "+14155491627") {
         if (await shouldForwardCall()) {
-          await telnyx.calls
+          await telnyx.calls.actions
             .transfer(callControlId, {
               to: `${process.env.MY_PHONE_NUMBER}`,
               early_media: true,
@@ -109,8 +109,8 @@ app.post("/intercom", async (request, _res) => {
         }
 
         console.log("call answered, playing beep");
-        telnyx.calls
-          .playbackStart(callControlId, {
+        telnyx.calls.actions
+          .startPlayback(callControlId, {
             audio_url: "https://doggo.ninja/yeLcOA.mp3",
             loop: 1,
             overlay: false,
@@ -123,7 +123,7 @@ app.post("/intercom", async (request, _res) => {
     } else if (call.data.event_type === "call.playback.ended") {
       if (call.data.payload?.media_url === "https://doggo.ninja/yeLcOA.mp3") {
         // After beep sound ends, listen for & parse passphrase
-        telnyx.calls.transcriptionStart(callControlId, {
+        telnyx.calls.actions.startTranscription(callControlId, {
           transcription_engine: "A",
           transcription_tracks: "inbound",
         });
@@ -148,7 +148,7 @@ app.post("/intercom", async (request, _res) => {
 
         if (isUsed) {
           console.log("Phrase already used, hanging up");
-          await telnyx.calls.hangup(callControlId, {});
+          await telnyx.calls.actions.hangup(callControlId, {});
         } else {
           await openDoor(callControlId);
           // await markPhraseAsUsed(matchingPhrase.key);

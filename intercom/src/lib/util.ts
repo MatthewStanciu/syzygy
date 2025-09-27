@@ -2,19 +2,19 @@ import { Redis } from "@upstash/redis";
 import Telnyx from "telnyx";
 import { distance } from "fastest-levenshtein";
 
-const telnyx = new Telnyx(`${process.env.TELNYX_API_KEY}`);
+const telnyx = new Telnyx({ apiKey: `${process.env.TELNYX_API_KEY}` });
 const redis = Redis.fromEnv();
 
 export async function openDoor(callControlId: string) {
   console.log("opening door!");
-  await telnyx.calls.sendDtmf(callControlId, {
+  await telnyx.calls.actions.sendDtmf(callControlId, {
     digits: "999999999999999999999999999999",
     duration_millis: 100,
   });
 
   setTimeout(async () => {
     console.log("hanging up");
-    await telnyx.calls.hangup(callControlId, {});
+    await telnyx.calls.actions.hangup(callControlId, {});
   }, 3000);
 }
 
