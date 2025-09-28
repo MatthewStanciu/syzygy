@@ -1,29 +1,15 @@
 import { Hono } from "hono";
 import { serveStatic } from "@hono/node-server/serve-static";
+import { upgradeWebSocket, websocket } from "hono/bun";
 import Telnyx from "telnyx";
 import * as http from "http";
 import {
-  getAllPhrases,
-  markPhraseAsUsed,
-  resetPhrasesIfAllUsed,
   openDoor,
-  isCloseMatch,
   shouldForwardCall,
+  checkForPhraseMatch,
+  upsampleAndAmplify,
 } from "./lib/util";
-
-// Patch http.ClientRequest to handle undefined timeout values
-// The current version of the Telnyx SDK is so bad
-const originalSetTimeout = http.ClientRequest.prototype.setTimeout;
-http.ClientRequest.prototype.setTimeout = function (
-  msecs: any,
-  callback?: () => void
-) {
-  // If msecs is undefined, use a default value of 30 seconds
-  if (msecs === undefined) {
-    msecs = 20000;
-  }
-  return originalSetTimeout.call(this, msecs, callback);
-};
+import { CallControlEvent } from "./lib/types";
 
 // Initialize Telnyx client
 const telnyx = new Telnyx({ apiKey: `${process.env.TELNYX_API_KEY}` });
@@ -31,20 +17,8 @@ const app = new Hono();
 
 const codeDigits: string[] = [];
 
-type TranscriptionData = {
-  confidence: number;
-  is_final: boolean;
-  transcript: string;
-};
-
-type CallControlEvent =
-  | Telnyx.CallHangupWebhookEvent
-  | Telnyx.CallInitiatedWebhookEvent
-  | Telnyx.CallAnsweredWebhookEvent
-  | Telnyx.CallSpeakEndedWebhookEvent
-  | Telnyx.TranscriptionWebhookEvent
-  | Telnyx.CallDtmfReceivedWebhookEvent
-  | Telnyx.CallPlaybackEndedWebhookEvent;
+const openAISockets = new Map<string, WebSocket>();
+const openAIWSUrl = "wss://api.openai.com/v1/realtime?intent=transcription";
 
 app.get("/intercom", async (request, _response) => {
   return request.html(`<h1>hi</h1>`);
@@ -55,7 +29,7 @@ app.get("/beep.mp3", serveStatic({ path: "./public/beep.mp3" }));
 
 app.post("/intercom", async (request, _res) => {
   const call = (await request.req.json()) as CallControlEvent;
-  console.log({ call });
+  // console.log({ call });
   try {
     const callControlId = call.data?.payload?.call_control_id;
     if (!call.data || !callControlId) {
@@ -68,10 +42,74 @@ app.post("/intercom", async (request, _res) => {
       const to = call.data.payload?.to;
 
       if (to && to === "+14155491627") {
-        console.log("initiated");
+        // console.log("initiated");
+        const openAIWS = new WebSocket(openAIWSUrl, {
+          // Zed's language server is complaining because it thinks this is Node.js' WebSocket implementation,
+          // but it's actually Bun's and you can do this with Bun's
+          headers: {
+            Authorization: "Bearer " + process.env.OPENAI_API_KEY,
+            // "OpenAI-Beta": "realtime=v1",
+          },
+        });
+
+        openAISockets.set(callControlId, openAIWS);
+
+        openAIWS.addEventListener("open", () => {
+          openAIWS.send(
+            JSON.stringify({
+              type: "session.update",
+              session: {
+                type: "transcription",
+                audio: {
+                  input: {
+                    format: {
+                      type: "audio/pcm",
+                      rate: 24000,
+                    },
+                    transcription: {
+                      model: "whisper-1",
+                      prompt:
+                        "Listen for surrealist phrases of a few words long. Repeat exactly what you hear, in English.",
+                      language: "en",
+                    },
+                    turn_detection: {
+                      type: "server_vad",
+                      threshold: 0.7,
+                      prefix_padding_ms: 300,
+                      silence_duration_ms: 1000,
+                    },
+                  },
+                },
+              },
+            })
+          );
+        });
+        openAIWS.addEventListener("message", (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            // console.log("OpenAI event:", data.type);
+            // console.log(data);
+
+            if (
+              data.type ===
+              "conversation.item.input_audio_transcription.completed"
+            ) {
+              const transcript = data.transcript;
+              console.log("Transcript:", transcript);
+
+              checkForPhraseMatch(transcript, callControlId);
+            }
+          } catch (e) {
+            console.error("Error parsing OpenAI message:", e);
+          }
+        });
+
         telnyx.calls.actions.answer(callControlId, {
           webhook_url_method: "POST",
           stream_track: "inbound_track",
+          stream_url: "wss://428cf086f998.ngrok-free.app/media-stream",
+          stream_bidirectional_codec: "L16",
+          stream_bidirectional_mode: "rtp",
           send_silence_when_idle: false,
           transcription: false,
           record_channels: "single",
@@ -83,7 +121,7 @@ app.post("/intercom", async (request, _res) => {
       }
     } else if (call.data.event_type === "call.answered") {
       const to = call.data.payload?.to;
-      console.log("to: ", call.data.payload?.to);
+      // console.log("to: ", call.data.payload?.to);
 
       if (to && to === "+14155491627") {
         if (await shouldForwardCall()) {
@@ -108,7 +146,7 @@ app.post("/intercom", async (request, _res) => {
           return request.json({ status: "success" });
         }
 
-        console.log("call answered, playing beep");
+        // console.log("call answered, playing beep");
         telnyx.calls.actions
           .startPlayback(callControlId, {
             audio_url: "https://doggo.ninja/yeLcOA.mp3",
@@ -120,69 +158,18 @@ app.post("/intercom", async (request, _res) => {
           })
           .catch((err) => console.error("failed to play beep", err));
       }
-    } else if (call.data.event_type === "call.playback.ended") {
-      if (call.data.payload?.media_url === "https://doggo.ninja/yeLcOA.mp3") {
-        // After beep sound ends, listen for & parse passphrase
-        telnyx.calls.actions.startTranscription(callControlId, {
-          transcription_engine: "A",
-          transcription_tracks: "inbound",
-        });
-      }
-    } else if (call.data.event_type === "call.transcription") {
-      const transcriptionData = call.data.payload!
-        .transcription_data as TranscriptionData;
-      const transcription = transcriptionData.transcript.trim().toLowerCase();
-      console.log({ transcription });
-
-      const allPhrases = await getAllPhrases();
-      const matchingPhrase = allPhrases.find((p) =>
-        isCloseMatch(p.key, transcription, 0.45)
-      );
-
-      if (matchingPhrase) {
-        console.log("Phrase recognized:", matchingPhrase.key);
-
-        const isUsed =
-          matchingPhrase.value &&
-          !isNaN(new Date(matchingPhrase.value as string).getTime());
-
-        if (isUsed) {
-          console.log("Phrase already used, hanging up");
-          await telnyx.calls.actions.hangup(callControlId, {});
-        } else {
-          await openDoor(callControlId);
-          // await markPhraseAsUsed(matchingPhrase.key);
-          // await resetPhrasesIfAllUsed();
-        }
-      } else {
-        if (transcription.split(" ").length >= 3) {
-          console.log(
-            "phrase not recognized, playing extremely loud incorrect buzzer"
-          );
-          // telnyx.calls
-          //   .playbackStart(callControlId, {
-          //     audio_url: "https://doggo.ninja/DJdRcR.mp3",
-          //     loop: 1,
-          //     overlay: false,
-          //     target_legs: "self",
-          //     cache_audio: true,
-          //     audio_type: "mp3",
-          //   })
-          //   .catch((err) => console.error("failed to play buzzer", err));
-        }
-      }
     } else if (call.data.event_type === "call.dtmf.received") {
-      console.log(call.data.payload);
+      // console.log(call.data.payload);
       const digit = call.data.payload!.digit as string;
       codeDigits.push(digit);
 
-      console.log(codeDigits.join(""), codeDigits.join("").slice(-4));
+      // console.log(codeDigits.join(""), codeDigits.join("").slice(-4));
       if (codeDigits.join("").slice(-4) === "1009") {
         await openDoor(callControlId);
         codeDigits.length = 0;
       }
     } else {
-      console.log("unknown event!", call.data.event_type);
+      // console.log("unknown event!", call.data.event_type);
     }
 
     return request.json({ status: "success" });
@@ -193,4 +180,46 @@ app.post("/intercom", async (request, _res) => {
   }
 });
 
-export default app;
+app.get(
+  "/media-stream",
+  upgradeWebSocket((c) => {
+    let callControlId = null;
+    let openAIWS: WebSocket | null | undefined = null;
+
+    return {
+      async onMessage(event, ws) {
+        let eventData = event.data.toString();
+        try {
+          const dataJson = JSON.parse(eventData);
+
+          if (dataJson.event === "start") {
+            callControlId = dataJson.start?.call_control_id;
+            openAIWS = openAISockets.get(callControlId);
+          }
+
+          if (
+            openAIWS &&
+            dataJson.event === "media" &&
+            dataJson.media &&
+            dataJson.media.payload
+          ) {
+            const audioBuffer = Buffer.from(dataJson.media.payload, "base64");
+            const upsampled = upsampleAndAmplify(audioBuffer);
+
+            openAIWS.send(
+              JSON.stringify({
+                type: "input_audio_buffer.append",
+                audio: upsampled,
+              })
+            );
+          }
+        } catch {}
+      },
+    };
+  })
+);
+
+export default {
+  fetch: app.fetch,
+  websocket,
+};

@@ -99,3 +99,58 @@ export function isCloseMatch(
     normalizedPhrase.length * threshold
   );
 }
+
+export async function checkForPhraseMatch(
+  transcript: string,
+  callControlId: string
+) {
+  const transcription = transcript.toLowerCase();
+
+  const allPhrases = await getAllPhrases();
+  const matchingPhrase = allPhrases.find((p) =>
+    isCloseMatch(p.key, transcription, 0.45)
+  );
+
+  if (matchingPhrase) {
+    console.log("Phrase recognized:", matchingPhrase.key);
+
+    const isUsed =
+      matchingPhrase.value &&
+      !isNaN(new Date(matchingPhrase.value as string).getTime());
+
+    if (isUsed) {
+      console.log("Phrase already used, hanging up");
+      await telnyx.calls.actions.hangup(callControlId, {});
+    } else {
+      await openDoor(callControlId);
+      // await markPhraseAsUsed(matchingPhrase.key);
+      // await resetPhrasesIfAllUsed();
+    }
+  }
+}
+
+export function upsampleAndAmplify(
+  buffer8k: Buffer,
+  gain: number = 3.0
+): string {
+  // Upsample 8kHz to 24kHz (3x upsampling) AND apply gain
+  const samplesIn = buffer8k.length / 2; // 16-bit = 2 bytes per sample
+  const buffer24k = Buffer.alloc(samplesIn * 3 * 2); // 3x more samples, 2 bytes each
+
+  for (let i = 0; i < samplesIn; i++) {
+    let sample = buffer8k.readInt16LE(i * 2);
+
+    // Apply gain (amplification)
+    sample = Math.round(sample * gain);
+
+    // Clamp to valid 16-bit range to prevent clipping
+    sample = Math.max(-32768, Math.min(32767, sample));
+
+    // Write each amplified sample 3 times for 3x upsampling
+    buffer24k.writeInt16LE(sample, i * 6);
+    buffer24k.writeInt16LE(sample, i * 6 + 2);
+    buffer24k.writeInt16LE(sample, i * 6 + 4);
+  }
+
+  return buffer24k.toString("base64");
+}
