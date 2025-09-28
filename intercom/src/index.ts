@@ -87,8 +87,8 @@ app.post("/intercom", async (request, _res) => {
         openAIWS.addEventListener("message", (event) => {
           try {
             const data = JSON.parse(event.data);
-            // console.log("OpenAI event:", data.type);
-            // console.log(data);
+            console.log("OpenAI event:", data.type);
+            console.log(data);
 
             if (
               data.type ===
@@ -146,7 +146,7 @@ app.post("/intercom", async (request, _res) => {
           return request.json({ status: "success" });
         }
 
-        // console.log("call answered, playing beep");
+        console.log("call answered, playing beep");
         telnyx.calls.actions
           .startPlayback(callControlId, {
             audio_url: "https://doggo.ninja/yeLcOA.mp3",
@@ -159,7 +159,7 @@ app.post("/intercom", async (request, _res) => {
           .catch((err) => console.error("failed to play beep", err));
       }
     } else if (call.data.event_type === "call.dtmf.received") {
-      // console.log(call.data.payload);
+      console.log(call.data.payload);
       const digit = call.data.payload!.digit as string;
       codeDigits.push(digit);
 
@@ -182,7 +182,7 @@ app.post("/intercom", async (request, _res) => {
 
 app.get(
   "/media-stream",
-  upgradeWebSocket((c) => {
+  upgradeWebSocket(() => {
     let callControlId = null;
     let openAIWS: WebSocket | null | undefined = null;
 
