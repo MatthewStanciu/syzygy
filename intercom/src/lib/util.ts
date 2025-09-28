@@ -129,10 +129,7 @@ export async function checkForPhraseMatch(
   }
 }
 
-export function upsampleAndAmplify(
-  buffer8k: Buffer,
-  gain: number = 5.0
-): string {
+export function upsampleAndAmplify(buffer8k: Buffer): string {
   // Upsample 8kHz to 24kHz (3x upsampling) AND apply gain
   const samplesIn = buffer8k.length / 2; // 16-bit = 2 bytes per sample
   const buffer24k = Buffer.alloc(samplesIn * 3 * 2); // 3x more samples, 2 bytes each
@@ -141,6 +138,7 @@ export function upsampleAndAmplify(
     let sample = buffer8k.readInt16LE(i * 2);
 
     // Apply gain (amplification)
+    const gain = 8.0;
     sample = Math.round(sample * gain);
 
     // Clamp to valid 16-bit range to prevent clipping
