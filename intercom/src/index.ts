@@ -51,7 +51,7 @@ app.get("/beep.mp3", serveStatic({ path: "./public/beep.mp3" }));
 
 app.post("/intercom", async (request, _res) => {
   const call = (await request.req.json()) as CallControlEvent;
-  console.log({ call });
+  // console.log({ call });
   try {
     const callControlId = call.data?.payload?.call_control_id;
     if (!call.data || !callControlId) {
@@ -64,9 +64,7 @@ app.post("/intercom", async (request, _res) => {
       const to = call.data.payload?.to;
 
       if (to && to === "+14155491627") {
-        console.log("initiated");
-
-        console.log("💾 Storing OpenAI WS with callControlId:", callControlId);
+        // console.log("initiated");
         const openAIWS = new WebSocket(openAIWSUrl, {
           // Zed's language server is complaining because it thinks this is Node.js' WebSocket implementation,
           // but it's actually Bun's and you can do this with Bun's
@@ -77,13 +75,8 @@ app.post("/intercom", async (request, _res) => {
         });
 
         openAISockets.set(callControlId, openAIWS);
-        console.log(
-          "✅ Stored. Map now has keys:",
-          Array.from(openAISockets.keys())
-        );
 
         openAIWS.addEventListener("open", () => {
-          console.log("OpenAI websocket opened for call: ", callControlId);
           openAIWS.send(
             JSON.stringify({
               type: "session.update",
@@ -116,8 +109,8 @@ app.post("/intercom", async (request, _res) => {
         openAIWS.addEventListener("message", (event) => {
           try {
             const data = JSON.parse(event.data);
-            console.log("OpenAI event:", data.type);
-            console.log(data);
+            // console.log("OpenAI event:", data.type);
+            // console.log(data);
 
             if (
               data.type ===
@@ -150,7 +143,7 @@ app.post("/intercom", async (request, _res) => {
       }
     } else if (call.data.event_type === "call.answered") {
       const to = call.data.payload?.to;
-      console.log("to: ", call.data.payload?.to);
+      // console.log("to: ", call.data.payload?.to);
 
       if (to && to === "+14155491627") {
         if (await shouldForwardCall()) {
@@ -175,7 +168,7 @@ app.post("/intercom", async (request, _res) => {
           return request.json({ status: "success" });
         }
 
-        console.log("call answered, playing beep");
+        // console.log("call answered, playing beep");
         telnyx.calls.actions
           .startPlayback(callControlId, {
             audio_url: "https://doggo.ninja/yeLcOA.mp3",
@@ -187,69 +180,18 @@ app.post("/intercom", async (request, _res) => {
           })
           .catch((err) => console.error("failed to play beep", err));
       }
-      // } else if (call.data.event_type === "call.playback.ended") {
-      //   if (call.data.payload?.media_url === "https://doggo.ninja/yeLcOA.mp3") {
-      //     // After beep sound ends, listen for & parse passphrase
-      //     telnyx.calls.actions.startTranscription(callControlId, {
-      //       transcription_engine: "A",
-      //       transcription_tracks: "inbound",
-      //     });
-      //   }
-      // } else if (call.data.event_type === "call.transcription") {
-      //   const transcriptionData = call.data.payload!
-      //     .transcription_data as TranscriptionData;
-      //   const transcription = transcriptionData.transcript.trim().toLowerCase();
-      //   console.log({ transcription });
-
-      //   const allPhrases = await getAllPhrases();
-      //   const matchingPhrase = allPhrases.find((p) =>
-      //     isCloseMatch(p.key, transcription, 0.45)
-      //   );
-
-      //   if (matchingPhrase) {
-      //     console.log("Phrase recognized:", matchingPhrase.key);
-
-      //     const isUsed =
-      //       matchingPhrase.value &&
-      //       !isNaN(new Date(matchingPhrase.value as string).getTime());
-
-      //     if (isUsed) {
-      //       console.log("Phrase already used, hanging up");
-      //       await telnyx.calls.actions.hangup(callControlId, {});
-      //     } else {
-      //       await openDoor(callControlId);
-      //       // await markPhraseAsUsed(matchingPhrase.key);
-      //       // await resetPhrasesIfAllUsed();
-      //     }
-      //   } else {
-      //     if (transcription.split(" ").length >= 3) {
-      //       console.log(
-      //         "phrase not recognized, playing extremely loud incorrect buzzer"
-      //       );
-      //       // telnyx.calls
-      //       //   .playbackStart(callControlId, {
-      //       //     audio_url: "https://doggo.ninja/DJdRcR.mp3",
-      //       //     loop: 1,
-      //       //     overlay: false,
-      //       //     target_legs: "self",
-      //       //     cache_audio: true,
-      //       //     audio_type: "mp3",
-      //       //   })
-      //       //   .catch((err) => console.error("failed to play buzzer", err));
-      //     }
-      //   }
     } else if (call.data.event_type === "call.dtmf.received") {
-      console.log(call.data.payload);
+      // console.log(call.data.payload);
       const digit = call.data.payload!.digit as string;
       codeDigits.push(digit);
 
-      console.log(codeDigits.join(""), codeDigits.join("").slice(-4));
+      // console.log(codeDigits.join(""), codeDigits.join("").slice(-4));
       if (codeDigits.join("").slice(-4) === "1009") {
         await openDoor(callControlId);
         codeDigits.length = 0;
       }
     } else {
-      console.log("unknown event!", call.data.event_type);
+      // console.log("unknown event!", call.data.event_type);
     }
 
     return request.json({ status: "success" });
@@ -281,27 +223,17 @@ app.get(
             openAIWS &&
             dataJson.event === "media" &&
             dataJson.media &&
-            dataJson.media.payload &&
-            openAIWS.readyState === WebSocket.OPEN
+            dataJson.media.payload
           ) {
-            // console.log("hiiiii heheheheheh", dataJson.media.payload);
+            const audioBuffer = Buffer.from(dataJson.media.payload, "base64");
+            const upsampled = upsample8kTo24k(audioBuffer);
 
-            if (
-              openAIWS &&
-              dataJson.event === "media" &&
-              dataJson.media &&
-              dataJson.media.payload
-            ) {
-              const audioBuffer = Buffer.from(dataJson.media.payload, "base64");
-              const upsampled = upsample8kTo24k(audioBuffer);
-
-              openAIWS.send(
-                JSON.stringify({
-                  type: "input_audio_buffer.append",
-                  audio: upsampled,
-                })
-              );
-            }
+            openAIWS.send(
+              JSON.stringify({
+                type: "input_audio_buffer.append",
+                audio: upsampled,
+              })
+            );
           }
         } catch {}
       },
