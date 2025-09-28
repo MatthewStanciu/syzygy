@@ -123,8 +123,8 @@ export async function checkForPhraseMatch(
       await telnyx.calls.actions.hangup(callControlId, {});
     } else {
       await openDoor(callControlId);
-      // await markPhraseAsUsed(matchingPhrase.key);
-      // await resetPhrasesIfAllUsed();
+      await markPhraseAsUsed(matchingPhrase.key);
+      await resetPhrasesIfAllUsed();
     }
   }
 }
