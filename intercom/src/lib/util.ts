@@ -138,7 +138,7 @@ export function upsampleAndAmplify(buffer8k: Buffer): string {
     let sample = buffer8k.readInt16LE(i * 2);
 
     // Apply gain (amplification)
-    const gain = 8.0;
+    const gain = 6.0;
     sample = Math.round(sample * gain);
 
     // Clamp to valid 16-bit range to prevent clipping
