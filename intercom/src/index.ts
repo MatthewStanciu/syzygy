@@ -4,30 +4,12 @@ import { upgradeWebSocket, websocket } from "hono/bun";
 import Telnyx from "telnyx";
 import * as http from "http";
 import {
-  getAllPhrases,
-  markPhraseAsUsed,
-  resetPhrasesIfAllUsed,
   openDoor,
-  isCloseMatch,
   shouldForwardCall,
   checkForPhraseMatch,
   upsampleAndAmplify,
 } from "./lib/util";
 import { CallControlEvent } from "./lib/types";
-
-// Patch http.ClientRequest to handle undefined timeout values
-// The current version of the Telnyx SDK is so bad
-const originalSetTimeout = http.ClientRequest.prototype.setTimeout;
-http.ClientRequest.prototype.setTimeout = function (
-  msecs: any,
-  callback?: () => void
-) {
-  // If msecs is undefined, use a default value of 30 seconds
-  if (msecs === undefined) {
-    msecs = 20000;
-  }
-  return originalSetTimeout.call(this, msecs, callback);
-};
 
 // Initialize Telnyx client
 const telnyx = new Telnyx({ apiKey: `${process.env.TELNYX_API_KEY}` });
