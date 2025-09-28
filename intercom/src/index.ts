@@ -2,7 +2,6 @@ import { Hono } from "hono";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { upgradeWebSocket, websocket } from "hono/bun";
 import Telnyx from "telnyx";
-import * as http from "http";
 import {
   openDoor,
   shouldForwardCall,
