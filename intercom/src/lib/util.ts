@@ -131,7 +131,7 @@ export async function checkForPhraseMatch(
 
 export function upsampleAndAmplify(
   buffer8k: Buffer,
-  gain: number = 3.0
+  gain: number = 5.0
 ): string {
   // Upsample 8kHz to 24kHz (3x upsampling) AND apply gain
   const samplesIn = buffer8k.length / 2; // 16-bit = 2 bytes per sample
