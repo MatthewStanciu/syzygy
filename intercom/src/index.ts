@@ -203,6 +203,7 @@ app.get(
             dataJson.media &&
             dataJson.media.payload
           ) {
+            console.log("made it here hehe", dataJson.media.payload);
             const audioBuffer = Buffer.from(dataJson.media.payload, "base64");
             const upsampled = upsampleAndAmplify(audioBuffer);
 
