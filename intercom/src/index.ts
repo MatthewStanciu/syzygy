@@ -107,7 +107,7 @@ app.post("/intercom", async (request, _res) => {
         telnyx.calls.actions.answer(callControlId, {
           webhook_url_method: "POST",
           stream_track: "inbound_track",
-          stream_url: "wss://428cf086f998.ngrok-free.app/media-stream",
+          stream_url: process.env.MEDIA_STREAM_URL,
           stream_bidirectional_codec: "L16",
           stream_bidirectional_mode: "rtp",
           send_silence_when_idle: false,
@@ -187,7 +187,7 @@ app.get(
     let openAIWS: WebSocket | null | undefined = null;
 
     return {
-      async onMessage(event, ws) {
+      async onMessage(event, _ws) {
         let eventData = event.data.toString();
         try {
           const dataJson = JSON.parse(eventData);
@@ -203,7 +203,6 @@ app.get(
             dataJson.media &&
             dataJson.media.payload
           ) {
-            console.log("made it here hehe", dataJson.media.payload);
             const audioBuffer = Buffer.from(dataJson.media.payload, "base64");
             const upsampled = upsampleAndAmplify(audioBuffer);
 
