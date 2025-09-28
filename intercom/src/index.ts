@@ -10,14 +10,10 @@ import {
   openDoor,
   isCloseMatch,
   shouldForwardCall,
-  upsample8kTo24k,
   checkForPhraseMatch,
+  upsampleAndAmplify,
 } from "./lib/util";
-import {
-  CallControlEvent,
-  TelnyxMediaWebsocketData,
-  TranscriptionData,
-} from "./lib/types";
+import { CallControlEvent } from "./lib/types";
 
 // Patch http.ClientRequest to handle undefined timeout values
 // The current version of the Telnyx SDK is so bad
@@ -226,7 +222,7 @@ app.get(
             dataJson.media.payload
           ) {
             const audioBuffer = Buffer.from(dataJson.media.payload, "base64");
-            const upsampled = upsample8kTo24k(audioBuffer);
+            const upsampled = upsampleAndAmplify(audioBuffer);
 
             openAIWS.send(
               JSON.stringify({

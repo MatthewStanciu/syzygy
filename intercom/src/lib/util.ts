@@ -129,14 +129,24 @@ export async function checkForPhraseMatch(
   }
 }
 
-export function upsample8kTo24k(buffer8k: Buffer): string {
-  // Upsample 8kHz to 24kHz (3x upsampling)
+export function upsampleAndAmplify(
+  buffer8k: Buffer,
+  gain: number = 3.0
+): string {
+  // Upsample 8kHz to 24kHz (3x upsampling) AND apply gain
   const samplesIn = buffer8k.length / 2; // 16-bit = 2 bytes per sample
   const buffer24k = Buffer.alloc(samplesIn * 3 * 2); // 3x more samples, 2 bytes each
 
   for (let i = 0; i < samplesIn; i++) {
-    const sample = buffer8k.readInt16LE(i * 2);
-    // Write each sample 3 times for 3x upsampling
+    let sample = buffer8k.readInt16LE(i * 2);
+
+    // Apply gain (amplification)
+    sample = Math.round(sample * gain);
+
+    // Clamp to valid 16-bit range to prevent clipping
+    sample = Math.max(-32768, Math.min(32767, sample));
+
+    // Write each amplified sample 3 times for 3x upsampling
     buffer24k.writeInt16LE(sample, i * 6);
     buffer24k.writeInt16LE(sample, i * 6 + 2);
     buffer24k.writeInt16LE(sample, i * 6 + 4);
