@@ -142,7 +142,7 @@ export function upsampleAndAmplify(buffer8k: Buffer): string {
   }
 
   // Calculate 95th percentile RMS normalization gain
-  const gain = calculate95thPercentileGain(audioData, 8000); // 8kHz sample rate
+  const gain = calculate95thPercentileGain(audioData, 8000); // 8kHz sample rate, which is what Telnyx sends us
 
   // Apply gain and upsample
   for (let i = 0; i < samplesIn; i++) {
@@ -167,23 +167,21 @@ function calculate95thPercentileGain(
   audioData: number[],
   sampleRate: number
 ): number {
-  // Calculate RMS in 50ms slices (like the original code)
+  // Calculate RMS in 50ms slices
   const sliceLen = Math.floor(sampleRate * 0.05); // 50ms slices
   const averages: number[] = [];
   let sum = 0.0;
 
   for (let i = 0; i < audioData.length; i++) {
-    sum += audioData[i] ** 2; // Square the sample
+    sum += audioData[i] ** 2;
 
     if (i % sliceLen === 0 && i > 0) {
-      // Calculate RMS for this slice
       const rms = Math.sqrt(sum / sliceLen);
       averages.push(rms);
       sum = 0;
     }
   }
 
-  // Handle remaining samples
   if (sum > 0) {
     const remainingSamples = audioData.length % sliceLen;
     if (remainingSamples > 0) {
@@ -195,25 +193,17 @@ function calculate95thPercentileGain(
   if (averages.length === 0) {
     return 1.0; // No audio data, return unity gain
   }
-
-  // Sort averages in ascending order
   averages.sort((a, b) => a - b);
 
-  // Take the 95th percentile
   const percentile95Index = Math.floor(averages.length * 0.95);
   const percentile95Value = averages[percentile95Index];
 
   if (percentile95Value === 0) {
-    return 1.0; // Avoid division by zero
+    return 1.0;
   }
 
-  // Calculate gain (like the original code)
   let gain = 1.0 / percentile95Value;
-
-  // Apply the same scaling as the original (/10.0)
   gain = gain / 10.0;
-
-  // Optional: Add some reasonable clamping
   gain = Math.max(gain, 0.1); // Minimum gain
   gain = Math.min(gain, 20.0); // Maximum gain
 
