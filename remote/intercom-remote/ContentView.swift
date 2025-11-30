@@ -26,6 +26,7 @@ struct ContentView: View {
                 }
           Spacer()
             if let ccreds = creds {
+                SubmitView(upstashActionError: $upstashActionError, ccreds: ccreds).padding()
                 FancyToggle(isOn: $isToggleOn)
                     .onChange(of: isToggleOn) { old, new in
                         Task {
@@ -55,7 +56,6 @@ struct ContentView: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity)
         .alert("Failed to call Upstash", isPresented: .constant(upstashActionError != nil)) {
             Button("Ok") {
                 upstashActionError = nil
