@@ -1,0 +1,33 @@
+{
+  "originHash" : "c5f9d3052ace17d71ec4f1b9f7495c69374cd20357d283aafc5f0872e599b58d",
+  "pins" : [
+    {
+      "identity" : "alamofire",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Alamofire/Alamofire.git",
+      "state" : {
+        "revision" : "513364f870f6bfc468f9d2ff0a95caccc10044c5",
+        "version" : "5.10.2"
+      }
+    },
+    {
+      "identity" : "keychain-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/evgenyneu/keychain-swift",
+      "state" : {
+        "revision" : "5e1b02b6a9dac2a759a1d5dbc175c86bd192a608",
+        "version" : "24.0.0"
+      }
+    },
+    {
+      "identity" : "keychainswiftui",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ImTheSquid/KeychainSwiftUI",
+      "state" : {
+        "branch" : "main",
+        "revision" : "e1c49efd7b11d1bbe47ba02bf11bd3599d558d42"
+      }
+    }
+  ],
+  "version" : 3
+}
