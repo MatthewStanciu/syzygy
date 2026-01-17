@@ -93,14 +93,16 @@ export type Phrase = {
 };
 
 export async function getAllPhrases(): Promise<Phrase[]> {
-  const keys = (await redis.keys("*")).filter((key) => key !== FLAGS_KEY);
+  const keys = (await redis.keys("*")).filter(
+    (key) => key && key !== FLAGS_KEY
+  );
   const phrasePairs = await Promise.all(
     keys.map(async (key) => ({
       key,
       value: (await redis.get(key)) as string | null,
     }))
   );
-  return phrasePairs;
+  return phrasePairs.filter((p) => p.key);
 }
 
 export async function markPhraseAsUsed(phrase: string): Promise<string> {
@@ -146,6 +148,11 @@ export function isCloseMatch(
 ): boolean {
   const normalizedPhrase = normalizeTextForMatching(phrase);
   const normalizedTranscript = normalizeTextForMatching(transcript);
+
+  // Skip empty phrases
+  if (!normalizedPhrase) {
+    return false;
+  }
 
   // Exact substring match
   if (normalizedTranscript.includes(normalizedPhrase)) {
