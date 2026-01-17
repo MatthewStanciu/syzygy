@@ -160,7 +160,7 @@ export function isCloseMatch(
 }
 
 export function isPhraseUsed(phrase: Phrase): boolean {
-  return phrase.value !== null && !isNaN(new Date(phrase.value).getTime());
+  return !!phrase.value && !isNaN(new Date(phrase.value).getTime());
 }
 
 export async function findMatchingPhrase(
