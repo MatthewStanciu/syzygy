@@ -1,4 +1,4 @@
-import Telnyx from "telnyx";
+import type Telnyx from "telnyx";
 
 export type CallControlEvent =
   | Telnyx.CallHangupWebhookEvent
