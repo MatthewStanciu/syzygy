@@ -17,7 +17,12 @@ export type IntercomFlags = {
 
 export async function getFlags(): Promise<IntercomFlags | null> {
   try {
-    return (await redis.json.get(FLAGS_KEY)) as IntercomFlags | null;
+    const data = await redis.get(FLAGS_KEY);
+    if (!data) return null;
+    if (typeof data === "string") {
+      return JSON.parse(data) as IntercomFlags;
+    }
+    return data as IntercomFlags;
   } catch (err) {
     console.error("Failed to get flags from redis:", err);
     return null;
