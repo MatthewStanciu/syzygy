@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 const getRandomPhrase = (phrases: string[]) =>
   phrases[Math.floor(Math.random() * phrases.length)];
 
+/// phoneNumber must have a country, however it can be in any format, eg +1 123-456-7890, 1 (123) 456-7890, 1i234567890, etc..
 export function List({
   phrases,
   initialPhrase,
@@ -53,7 +54,11 @@ export function List({
       </div>
 
       {phoneNumber && (
-        <footer className="opacity-50">{phoneNumber}</footer>
+        <footer className="opacity-50">
+          <a href={`tel:+${phoneNumber.replaceAll(/\s|\(|\)|-|\+/gm, "")}`}>
+            {phoneNumber}
+          </a>
+        </footer>
       )}
     </main>
   );
