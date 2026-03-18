@@ -7,6 +7,9 @@ import {
   DOOR_OPEN_DTMF_DURATION_MS,
   HANGUP_DELAY_MS,
 } from "./config";
+import { Context } from "hono";
+import { SOLENOID } from "./handlers";
+import { WSContext } from "hono/ws";
 
 // =============================================================================
 // Audio Processing
@@ -42,7 +45,7 @@ export function upsampleAndAmplify(buffer8k: Buffer): string {
 
 function calculate95thPercentileGain(audioData: number[]): number {
   const sliceLen = Math.floor(
-    AUDIO.INPUT_SAMPLE_RATE * (AUDIO.RMS_SLICE_MS / 1000)
+    AUDIO.INPUT_SAMPLE_RATE * (AUDIO.RMS_SLICE_MS / 1000),
   );
   const rmsValues: number[] = [];
   let sum = 0.0;
@@ -94,13 +97,13 @@ export type Phrase = {
 
 export async function getAllPhrases(): Promise<Phrase[]> {
   const keys = (await redis.keys("*")).filter(
-    (key) => key && key !== FLAGS_KEY
+    (key) => key && key !== FLAGS_KEY,
   );
   const phrasePairs = await Promise.all(
     keys.map(async (key) => ({
       key,
       value: (await redis.get(key)) as string | null,
-    }))
+    })),
   );
   return phrasePairs.filter((p) => p.key);
 }
@@ -115,7 +118,7 @@ export async function resetPhrasesIfAllUsed(): Promise<boolean> {
   const allPhrases = await getAllPhrases();
 
   const allHaveDates = allPhrases.every(
-    (p) => p.value && !isNaN(new Date(p.value).getTime())
+    (p) => p.value && !isNaN(new Date(p.value).getTime()),
   );
 
   if (!allHaveDates) {
@@ -124,7 +127,7 @@ export async function resetPhrasesIfAllUsed(): Promise<boolean> {
 
   // Sort by date descending (most recent first)
   const sortedPhrases = allPhrases.sort(
-    (a, b) => new Date(b.value!).getTime() - new Date(a.value!).getTime()
+    (a, b) => new Date(b.value!).getTime() - new Date(a.value!).getTime(),
   );
 
   // Keep the 3 most recently used, reset the rest
@@ -132,7 +135,7 @@ export async function resetPhrasesIfAllUsed(): Promise<boolean> {
   await Promise.all(phrasesToReset.map((phrase) => redis.set(phrase.key, "")));
 
   console.log(
-    `All phrases exhausted; reset ${phrasesToReset.length} phrases, all but last 3 used.`
+    `All phrases exhausted; reset ${phrasesToReset.length} phrases, all but last 3 used.`,
   );
   return true;
 }
@@ -144,7 +147,7 @@ function normalizeTextForMatching(text: string): string {
 export function isCloseMatch(
   phrase: string,
   transcript: string,
-  threshold: number = PHRASE_MATCH_THRESHOLD
+  threshold: number = PHRASE_MATCH_THRESHOLD,
 ): boolean {
   const normalizedPhrase = normalizeTextForMatching(phrase);
   const normalizedTranscript = normalizeTextForMatching(transcript);
@@ -171,7 +174,7 @@ export function isPhraseUsed(phrase: Phrase): boolean {
 }
 
 export async function findMatchingPhrase(
-  transcript: string
+  transcript: string,
 ): Promise<Phrase | undefined> {
   const transcription = transcript.toLowerCase();
   const allPhrases = await getAllPhrases();
@@ -182,12 +185,19 @@ export async function findMatchingPhrase(
 // Door Control
 // =============================================================================
 
-export async function openDoor(callControlId: string): Promise<void> {
+export async function openDoor(
+  callControlId: string,
+  context: Context,
+): Promise<void> {
   console.log("Opening door!");
   await telnyx.calls.actions.sendDtmf(callControlId, {
     digits: DOOR_OPEN_DTMF_SEQUENCE,
     duration_millis: DOOR_OPEN_DTMF_DURATION_MS,
   });
+
+  (context.get(SOLENOID) as WSContext | null)?.send(
+    JSON.stringify({ type: "Unlock" }),
+  );
 
   setTimeout(async () => {
     console.log("Hanging up");
@@ -197,7 +207,8 @@ export async function openDoor(callControlId: string): Promise<void> {
 
 export async function checkForPhraseMatch(
   transcript: string,
-  callControlId: string
+  callControlId: string,
+  context: Context,
 ): Promise<void> {
   const matchingPhrase = await findMatchingPhrase(transcript);
 
@@ -211,7 +222,7 @@ export async function checkForPhraseMatch(
     console.log("Phrase already used, hanging up");
     await telnyx.calls.actions.hangup(callControlId, {});
   } else {
-    await openDoor(callControlId);
+    await openDoor(callControlId, context);
     await markPhraseAsUsed(matchingPhrase.key);
     await resetPhrasesIfAllUsed();
   }

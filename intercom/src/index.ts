@@ -1,7 +1,11 @@
 import { Hono } from "hono";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { upgradeWebSocket, websocket } from "hono/bun";
-import { handleCallEvent, createMediaStreamHandler } from "./handlers";
+import {
+  handleCallEvent,
+  createMediaStreamHandler,
+  createSolenoidHandler,
+} from "./handlers";
 
 const app = new Hono();
 
@@ -18,8 +22,11 @@ app.post("/intercom", handleCallEvent);
 // WebSocket for media streaming
 app.get(
   "/media-stream",
-  upgradeWebSocket(() => createMediaStreamHandler())
+  upgradeWebSocket(() => createMediaStreamHandler()),
 );
+
+// Solenoid WebSocket
+app.get("/solenoid", upgradeWebSocket(createSolenoidHandler));
 
 export default {
   fetch: app.fetch,

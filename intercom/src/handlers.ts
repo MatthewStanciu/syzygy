@@ -1,5 +1,5 @@
 import type { Context } from "hono";
-import type { WSContext, WSMessageReceive } from "hono/ws";
+import type { WSContext, WSEvents, WSMessageReceive } from "hono/ws";
 import { telnyx, shouldForwardCall } from "./services";
 import { openDoor, checkForPhraseMatch, upsampleAndAmplify } from "./utils";
 import {
@@ -51,7 +51,7 @@ export async function handleCallEvent(c: Context): Promise<Response> {
 
       case "call.initiated":
         if (isIntercomCall(to)) {
-          await handleInitiated(callControlId);
+          await handleInitiated(callControlId, c);
         }
         break;
 
@@ -62,7 +62,7 @@ export async function handleCallEvent(c: Context): Promise<Response> {
         break;
 
       case "call.dtmf.received":
-        await handleDtmfReceived(callControlId, call);
+        await handleDtmfReceived(callControlId, call, c);
         break;
     }
 
@@ -79,7 +79,10 @@ function handleHangup(callControlId: string): void {
   dtmfDigitsPerCall.delete(callControlId);
 }
 
-async function handleInitiated(callControlId: string): Promise<void> {
+async function handleInitiated(
+  callControlId: string,
+  context: Context,
+): Promise<void> {
   const openAIWS = new WebSocket(OPENAI_WS_URL, {
     headers: {
       Authorization: "Bearer " + ENV.OPENAI_API_KEY,
@@ -115,7 +118,7 @@ async function handleInitiated(callControlId: string): Promise<void> {
             },
           },
         },
-      })
+      }),
     );
   });
 
@@ -130,7 +133,7 @@ async function handleInitiated(callControlId: string): Promise<void> {
       ) {
         const transcript = data.transcript;
         console.log("Transcript:", transcript);
-        checkForPhraseMatch(transcript, callControlId);
+        checkForPhraseMatch(transcript, callControlId, context);
       }
     } catch (e) {
       console.error("Error parsing OpenAI message:", e);
@@ -194,7 +197,8 @@ async function handleAnswered(callControlId: string): Promise<void> {
 
 async function handleDtmfReceived(
   callControlId: string,
-  call: CallControlEvent
+  call: CallControlEvent,
+  context: Context,
 ): Promise<void> {
   if (call.data?.event_type !== "call.dtmf.received") return;
 
@@ -212,7 +216,7 @@ async function handleDtmfReceived(
 
   const enteredCode = digits.join("").slice(-DOOR_CODE.length);
   if (enteredCode === DOOR_CODE) {
-    await openDoor(callControlId);
+    await openDoor(callControlId, context);
     digits.length = 0;
   }
 }
@@ -254,12 +258,36 @@ export function createMediaStreamHandler() {
             JSON.stringify({
               type: "input_audio_buffer.append",
               audio: upsampled,
-            })
+            }),
           );
         }
       } catch (err) {
         console.error("Error processing media stream message:", err);
       }
+    },
+  };
+}
+
+export const SOLENOID = "solenoid";
+
+export function createSolenoidHandler(c: Context): WSEvents {
+  return {
+    async onMessage(event: MessageEvent<WSMessageReceive>, ws: WSContext) {
+      if (c.get(SOLENOID) && c.get(SOLENOID) !== ws) {
+        ws.close(1, "solenoid already connected");
+      } else if (
+        !c.get(SOLENOID) &&
+        event.data === c.env.SOLENOID_SECRET &&
+        c.env.SOLENOID_SECRET
+      ) {
+        // Set as primary
+        c.set(SOLENOID, ws);
+      } else {
+        // Handle non-auth message later
+      }
+    },
+    async onClose(_evt, ws: WSContext) {
+      if (c.get(SOLENOID) === ws) c.set(SOLENOID, null);
     },
   };
 }
