@@ -291,3 +291,7 @@ export function createSolenoidHandler(c: Context): WSEvents {
     },
   };
 }
+
+export function ready(c: Context): Response {
+  return c.get(SOLENOID) ? c.json({}, 200) : c.json({}, 503);
+}

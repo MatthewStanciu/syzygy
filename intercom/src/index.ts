@@ -5,6 +5,7 @@ import {
   handleCallEvent,
   createMediaStreamHandler,
   createSolenoidHandler,
+  ready,
 } from "./handlers";
 
 const app = new Hono();
@@ -27,6 +28,7 @@ app.get(
 
 // Solenoid WebSocket
 app.get("/solenoid", upgradeWebSocket(createSolenoidHandler));
+app.get("/ready", ready);
 
 export default {
   fetch: app.fetch,
