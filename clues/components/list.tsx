@@ -9,9 +9,11 @@ const getRandomPhrase = (phrases: string[]) =>
 export function List({
   phrases,
   initialPhrase,
+  phoneNumber,
 }: {
   phrases: string[];
   initialPhrase: string;
+  phoneNumber: string | null;
 }) {
   const [randomPhrase, setRandomPhrase] = useState(initialPhrase);
   return (
@@ -50,7 +52,9 @@ export function List({
         </p>
       </div>
 
-      {/* <footer className="opacity-50">Text Matthew for help</footer> */}
+      {phoneNumber && (
+        <footer className="opacity-50">{phoneNumber}</footer>
+      )}
     </main>
   );
 }
